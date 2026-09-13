@@ -8,6 +8,10 @@
 
 ## 快速开始
 
+**只想用桌面版？[前往 Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest)**：
+- [安装版 OmniConvert_v0.4.2_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.4.2/OmniConvert_v0.4.2_x64-setup.exe)（约 3.6MB：安装向导 + 开始菜单 + 可卸载）
+- [绿色版 OmniConvert_v0.4.2_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.4.2/OmniConvert_v0.4.2_x64-portable.exe)（约 9.3MB：双击即用）
+
 ```
 双击 start.bat
 → 自动启动本地服务并在浏览器打开 http://localhost:8137

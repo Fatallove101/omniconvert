@@ -8,6 +8,10 @@ A BentoPDF / Stirling-PDF style file conversion tool that runs **entirely in you
 
 ## Quick Start
 
+**Just want the desktop app? [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest)**:
+- [Installer OmniConvert_v0.4.2_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.4.2/OmniConvert_v0.4.2_x64-setup.exe) (~3.6MB: setup wizard + Start menu + uninstaller)
+- [Portable OmniConvert_v0.4.2_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.4.2/OmniConvert_v0.4.2_x64-portable.exe) (~9.3MB: download and run, no install)
+
 ```
 Double-click start.bat
 → starts a local server and opens http://localhost:8137
