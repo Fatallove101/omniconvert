@@ -17,6 +17,9 @@
 
 * { box-sizing: border-box; }
 
+/* hidden 属性优先级最高：防止组件自身 display 覆盖导致常显 */
+[hidden] { display: none !important; }
+
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* ---------- 深浅色切换按钮 ---------- */
