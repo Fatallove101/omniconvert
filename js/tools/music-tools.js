@@ -38,6 +38,19 @@
     kwm: 'mp3',
   };
 
+  /* 这些来源的格式嗅探失败时，允许按扩展名兜底（老格式算法成熟） */
+  const TRUST_FALLBACK = {
+    ncm: 1,
+    qmc0: 1,
+    qmc3: 1,
+    qmcflac: 1,
+    qmcogg: 1,
+    qmcm: 1,
+    mflac: 1,
+    mgg: 1,
+    mgg1: 1,
+  };
+
   function extOf(name) {
     const m = name.match(/\.([a-z0-9]+)$/i);
     return m ? m[1].toLowerCase() : '';
@@ -81,7 +94,8 @@
     const off = kh.offsetToData;
     if (!(off > 0 && off < buf.length)) throw new Error('KGM 结构异常');
     const body = buf.slice(off);
-    kg.decrypt(body, off);
+    /* 实测：decrypt 的 offset 参数须为相对 body 的偏移（传绝对偏移会整段错位） */
+    kg.decrypt(body, 0);
     return body;
   }
 
@@ -117,7 +131,7 @@
     const off = 0x400;
     if (buf.length <= off) throw new Error('KWM 文件太小');
     const body = buf.slice(off);
-    d.decrypt(body, off);
+    d.decrypt(body, 0);
     return body;
   }
 
@@ -171,7 +185,12 @@
           const buf = new Uint8Array(await App.readAsArrayBuffer(f));
           const out = fn(um, buf, f.name);
           if (!out || !out.length) throw new Error('转换结果为空');
-          const ext = detectExt(um, out) || FALLBACK_EXT[extIn] || 'mp3';
+          const det = detectExt(um, out);
+          let ext = det || FALLBACK_EXT[extIn] || null;
+          /* 输出自检：识别不出音频类型的，明确报错而不是输出损坏文件 */
+          if (!ext || (!det && !TRUST_FALLBACK[extIn])) {
+            throw new Error('转换后无法识别音频格式——该加密变体可能不支持离线转换（如酷狗新版 KGMA v3+，需要联网获取每首歌的密钥）');
+          }
           results.push({
             name: `${baseOf(f.name)}.${ext}`,
             blob: new Blob([out], { type: MIME[ext] || 'application/octet-stream' }),
