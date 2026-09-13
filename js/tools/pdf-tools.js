@@ -451,7 +451,93 @@
     },
   });
 
-  /* ---------- 8. PDF 旋转 ---------- */
+  /* ---------- 8. PDF 加密（qpdf WASM，AES-256） ---------- */
+
+  /** 运行一次 qpdf 命令：写入 /in.pdf，返回 /out.pdf 与退出码 */
+  async function qpdfRun(args, inputBytes) {
+    const mod = await App.qpdf();
+    /* 清理上一轮的临时文件 */
+    mod.FS.readdir('/').forEach((f) => {
+      if (f === '.' || f === '..') return;
+      try {
+        if (mod.FS.isFile(mod.FS.stat('/' + f).mode)) mod.FS.unlink('/' + f);
+      } catch (e) { /* 忽略 */ }
+    });
+    mod.FS.writeFile('/in.pdf', inputBytes);
+    App._qpdfOut.length = 0;
+    App._qpdfErr.length = 0;
+    let code = 0;
+    try {
+      mod.callMain(args);
+    } catch (e) {
+      /* Emscripten 以 ExitStatus 结束 callMain，status 即退出码 */
+      code = e && typeof e.status === 'number' ? e.status : 1;
+    }
+    let out = null;
+    try {
+      out = mod.FS.readFile('/out.pdf');
+    } catch (e) { /* 未产出输出 */ }
+    return { code, out, errText: App._qpdfErr.join('\n'), outText: App._qpdfOut.join('\n') };
+  }
+
+  App.registerTool({
+    id: 'pdf-encrypt',
+    icon: '🔒',
+    name: 'PDF 加密',
+    desc: '给 PDF 添加密码保护（AES-256）',
+    keywords: 'encrypt 加密 密码 保护 安全',
+    category: 'pdf',
+    accept: '.pdf',
+    acceptText: 'PDF 文件',
+    multiple: false,
+    options: [
+      { key: 'password', label: '打开密码（必填）', type: 'text', default: '', placeholder: '接收者打开文件时输入' },
+      { key: 'owner', label: '权限密码（留空则与打开密码相同）', type: 'text', default: '', placeholder: '用于解除限制' },
+    ],
+    async run(files, opts, ctx) {
+      const pw = (opts.password || '').trim();
+      if (!pw) throw new Error('请填写打开密码');
+      const owner = (opts.owner || '').trim() || pw;
+      ctx.setStatus('加载加密引擎（qpdf WASM）…');
+      const bytes = new Uint8Array(await App.readAsArrayBuffer(files[0]));
+      const r = await qpdfRun(['--encrypt', pw, owner, '256', '--', '/in.pdf', '/out.pdf'], bytes);
+      if (!r.out) throw new Error('加密失败：' + (r.errText.split('\n').pop() || '退出码 ' + r.code));
+      const name = files[0].name.replace(/\.pdf$/i, '') + '-encrypted.pdf';
+      ctx.setStatus('加密完成（AES-256，已生效）', true);
+      return [{ name, blob: pdfBlob(r.out) }];
+    },
+  });
+
+  /* ---------- 9. PDF 解密 ---------- */
+  App.registerTool({
+    id: 'pdf-decrypt',
+    icon: '🔓',
+    name: 'PDF 解密',
+    desc: '移除 PDF 的密码保护（需已知密码）',
+    keywords: 'decrypt 解密 去除密码 解锁 unlock',
+    category: 'pdf',
+    accept: '.pdf',
+    acceptText: 'PDF 文件',
+    multiple: false,
+    options: [
+      { key: 'password', label: '密码（打开密码；仅限制权限的文件可留空）', type: 'text', default: '', placeholder: '已知密码' },
+    ],
+    async run(files, opts, ctx) {
+      const pw = (opts.password || '').trim();
+      ctx.setStatus('加载解密引擎（qpdf WASM）…');
+      const bytes = new Uint8Array(await App.readAsArrayBuffer(files[0]));
+      const args = ['--decrypt'];
+      if (pw) args.push('--password=' + pw);
+      args.push('/in.pdf', '/out.pdf');
+      const r = await qpdfRun(args, bytes);
+      if (!r.out) throw new Error('解密失败：密码错误或文件损坏');
+      const name = files[0].name.replace(/\.pdf$/i, '') + '-decrypted.pdf';
+      ctx.setStatus('已移除密码保护', true);
+      return [{ name, blob: pdfBlob(r.out) }];
+    },
+  });
+
+  /* ---------- 10. PDF 旋转 ---------- */
   App.registerTool({
     id: 'pdf-rotate',
     icon: '🔄',

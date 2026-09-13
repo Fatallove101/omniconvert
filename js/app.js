@@ -139,6 +139,20 @@
     return pdfjsLib;
   };
 
+  /** qpdf WASM 懒加载（加密/解密引擎），单例 */
+  App.qpdf = function () {
+    if (!App._qpdfPromise) {
+      App._qpdfOut = [];
+      App._qpdfErr = [];
+      App._qpdfPromise = window.Module({
+        locateFile: () => 'vendor/qpdf/qpdf.wasm',
+        print: (t) => App._qpdfOut.push(t),
+        printErr: (t) => App._qpdfErr.push(t),
+      });
+    }
+    return App._qpdfPromise;
+  };
+
   /* ---------- 工具注册 ---------- */
 
   App.registerTool = function (def) {
