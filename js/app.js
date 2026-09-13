@@ -309,6 +309,7 @@
             <div class="dz-hint">支持：${tool.acceptText || tool.accept || '任意文件'} · 处理在本地完成</div>
           </div>
           <ul id="file-list" class="file-list"></ul>
+          ${tool.organize ? '<div id="organizer" class="organizer"></div>' : ''}
           ${optionsHtml ? `<div class="options">${optionsHtml}</div>` : ''}
           <button id="run-btn" class="run-btn" disabled>开始转换</button>
           <div id="progress-wrap" class="progress-wrap" hidden>
@@ -371,6 +372,7 @@
       App.state.files = files.slice(0, 1);
     }
     App.renderFileList();
+    if (tool.organize) App.renderOrganizer();
   };
 
   App.renderFileList = function () {
@@ -390,6 +392,7 @@
       btn.addEventListener('click', () => {
         App.state.files.splice(+btn.dataset.i, 1);
         App.renderFileList();
+        if (App.getTool(App.state.toolId) && App.getTool(App.state.toolId).organize) App.renderOrganizer();
       })
     );
     const runBtn = App.$('#run-btn');
@@ -412,6 +415,122 @@
       box.hidden = false;
       box.textContent = '❌ ' + msg;
     }
+  };
+
+  /* ---------- 页面重排（organize 类工具） ---------- */
+
+  App.renderOrganizer = async function () {
+    const box = App.$('#organizer');
+    if (!box) return;
+    const file = App.state.files[0];
+    if (!file) {
+      App.state.pages = null;
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML = '<div class="org-status">生成页面缩略图…</div><div class="pages-grid" id="pages-grid"></div>';
+    try {
+      const buf = await App.readAsArrayBuffer(file);
+      const pdf = await App.pdfjs().getDocument({ data: new Uint8Array(buf) }).promise;
+      App.state.pages = [];
+      App.state._thumbUrls = [];
+      const grid = App.$('#pages-grid');
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const vp1 = page.getViewport({ scale: 1 });
+        const scale = 120 / Math.max(vp1.width, vp1.height);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(vp1.width * scale);
+        canvas.height = Math.ceil(vp1.height * scale);
+        const ctx2 = canvas.getContext('2d', { alpha: false });
+        ctx2.fillStyle = '#fff';
+        ctx2.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx2, viewport: page.getViewport({ scale }) }).promise;
+        App.state._thumbUrls.push(canvas.toDataURL('image/jpeg', 0.75));
+        App.state.pages.push({ src: i - 1, rot: 0 });
+        const st = App.$('.org-status');
+        if (st) st.textContent = `生成页面缩略图 ${i}/${pdf.numPages}…`;
+        await App.nextFrame();
+      }
+      App.renderPageCards();
+    } catch (e) {
+      box.innerHTML = `<div class="org-status">缩略图生成失败：${e.message || e}</div>`;
+    }
+  };
+
+  App.renderPageCards = function () {
+    const grid = App.$('#pages-grid');
+    if (!grid || !App.state.pages) return;
+    grid.innerHTML = App.state.pages
+      .map(
+        (p, i) => `
+        <div class="page-card" draggable="true" data-i="${i}">
+          <div class="page-thumb"><img src="${App.state._thumbUrls[p.src]}" class="${p.rot ? 'r' + p.rot : ''}" alt="第${p.src + 1}页" /></div>
+          <div class="page-num">原第 ${p.src + 1} 页</div>
+          <div class="page-btns">
+            <button type="button" data-act="left" title="前移">◀</button>
+            <button type="button" data-act="right" title="后移">▶</button>
+            <button type="button" data-act="rot" title="旋转 90°">🔄</button>
+            <button type="button" data-act="del" title="删除此页">🗑️</button>
+          </div>
+        </div>`
+      )
+      .join('');
+    let dragFrom = null;
+    App.$$('.page-card', grid).forEach((card) => {
+      const i = +card.dataset.i;
+      card.addEventListener('dragstart', () => {
+        dragFrom = i;
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        card.classList.add('drop-target');
+      });
+      card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('drop-target');
+        if (dragFrom != null && dragFrom !== i) App.movePage(dragFrom, i);
+        dragFrom = null;
+      });
+      App.$$('.page-btns button', card).forEach((btn) =>
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const act = btn.dataset.act;
+          if (act === 'left' && i > 0) App.movePage(i, i - 1);
+          else if (act === 'right' && i < App.state.pages.length - 1) App.movePage(i, i + 1);
+          else if (act === 'rot') App.rotatePage(i);
+          else if (act === 'del') App.removePage(i);
+        })
+      );
+    });
+    const st = App.$('.org-status');
+    if (st)
+      st.textContent = `共 ${App.state.pages.length} 页 · 拖拽缩略图调整顺序（手机用 ◀ ▶），🗑️ 删除页面，🔄 旋转页面，然后点“开始转换”`;
+  };
+
+  App.movePage = function (from, to) {
+    const pages = App.state.pages;
+    if (!pages || from < 0 || to < 0 || from >= pages.length || to >= pages.length) return;
+    const [p] = pages.splice(from, 1);
+    pages.splice(to, 0, p);
+    App.renderPageCards();
+  };
+
+  App.rotatePage = function (i) {
+    const p = App.state.pages[i];
+    if (!p) return;
+    p.rot = (p.rot + 90) % 360;
+    App.renderPageCards();
+  };
+
+  App.removePage = function (i) {
+    const pages = App.state.pages;
+    if (!pages || pages.length <= 1) return;
+    pages.splice(i, 1);
+    App.renderPageCards();
   };
 
   App.runTool = async function (id) {

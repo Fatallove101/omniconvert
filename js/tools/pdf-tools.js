@@ -537,7 +537,42 @@
     },
   });
 
-  /* ---------- 10. PDF 旋转 ---------- */
+  /* ---------- 10. PDF 页面重排 ---------- */
+  App.registerTool({
+    id: 'pdf-organize',
+    icon: '🧩',
+    name: 'PDF 页面重排',
+    desc: '拖拽调整页面顺序，可删除或旋转页面',
+    keywords: 'organize 重排 排序 拖拽 删除页面 页面管理 整理',
+    category: 'pdf',
+    accept: '.pdf',
+    acceptText: 'PDF 文件',
+    multiple: false,
+    organize: true,
+    async run(files, opts, ctx) {
+      if (!App.state.pages || !App.state.pages.length) {
+        throw new Error('页面缩略图尚未生成完毕，请稍候再点“开始转换”');
+      }
+      ctx.setStatus('按新顺序生成 PDF…');
+      ctx.setProgress(0.3);
+      const file = files[0];
+      const src = await loadPdf(file);
+      const out = await PDFDocument.create();
+      const idxs = App.state.pages.map((p) => p.src);
+      const copied = await out.copyPages(src, idxs);
+      copied.forEach((page, i) => {
+        const rot = App.state.pages[i].rot;
+        if (rot) page.setRotation(degrees(((page.getRotation().angle || 0) + rot) % 360));
+        out.addPage(page);
+      });
+      ctx.setProgress(0.85);
+      const bytes = await out.save();
+      ctx.setStatus(`已按新顺序输出 ${App.state.pages.length} 页`, true);
+      return [{ name: file.name.replace(/\.pdf$/i, '') + '-reordered.pdf', blob: pdfBlob(bytes) }];
+    },
+  });
+
+  /* ---------- 11. PDF 旋转 ---------- */
   App.registerTool({
     id: 'pdf-rotate',
     icon: '🔄',
