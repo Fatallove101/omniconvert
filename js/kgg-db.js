@@ -83,12 +83,14 @@
 
   /** 从解密后的 SQLite 提取 { EncryptionKeyId: EncryptionKey } 映射（用 sql.js） */
   App.extractKggKeyMapping = function (sqliteBytes) {
-    if (typeof window.initSqlJs === 'undefined') {
+    /* window.exports 垫片可能让 sql.js 的 UMD 把 initSqlJs 挂到 exports 上，两处都找 */
+    const sqlInit = (window.exports && window.exports.initSqlJs) || window.initSqlJs;
+    if (typeof sqlInit !== 'function') {
       throw new Error('SQLite 引擎未加载，请刷新页面重试');
     }
-    return window.initSqlJs({
+    return Promise.resolve(sqlInit({
       locateFile: () => 'vendor/sqljs/sql-wasm.wasm',
-    }).then((SQL) => {
+    })).then((SQL) => {
       const db = new SQL.Database(sqliteBytes);
       try {
         const stmt = db.prepare("select EncryptionKeyId, EncryptionKey from ShareFileItems where EncryptionKey != '' and EncryptionKey is not null");

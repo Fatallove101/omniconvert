@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.21',
+    VERSION: 'v1.22',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -811,8 +811,23 @@
       dbInput.addEventListener('change', async () => {
         const f = dbInput.files && dbInput.files[0];
         if (!f) return;
-        dbStatus.textContent = '解密密钥库…';
+        dbStatus.textContent = '检查解密模块…';
         try {
+          /* 自愈：任何缺失的模块现场从服务器重新拉取执行（对抗旧缓存/加载失败） */
+          for (const [file, probe] of [
+            ['/js/md5.js', () => App.md5],
+            ['/js/aes.js', () => App.aesCbcDecryptNoPad],
+            ['/js/kgg-db.js', () => App.decryptKggDb],
+          ]) {
+            if (typeof probe() !== 'function') {
+              const src = await (await fetch(file)).text();
+              new Function(src)();
+            }
+          }
+          if (typeof App.decryptKggDb !== 'function') {
+            throw new Error('模块自愈失败，请 Ctrl+F5 强制刷新后重试');
+          }
+          dbStatus.textContent = '解密密钥库…';
           const bytes = new Uint8Array(await f.arrayBuffer());
           const dec = App.decryptKggDb(bytes);
           const map = await App.extractKggKeyMapping(dec);
