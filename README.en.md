@@ -122,6 +122,27 @@ Artifacts:
 4. **UI batch 2**: mascot state machine, smart drag-drop detection, tesseract.js OCR
 5. i18n (English UI)
 
+## Compliance & Risk Boundary
+
+> The following is an engineering compliance statement, not legal advice.
+
+You should only use this project under these premises:
+
+- Only process **local files that you personally have lawful access to**;
+- Verify on your own that your usage complies with local laws, copyright rules, platform agreements, and organizational policies.
+
+Do not use this project for:
+
+- Bulk distribution, resale, monetization;
+- Circumventing paid licensing.
+
+This project makes no promises regarding:
+
+- Suitability for any specific region, platform rules, or purpose;
+- Compliance with the regulations of your jurisdiction;
+- Readiness of any specific commercial use;
+- Liability for user infringement, breach of contract, or rule violations.
+
 ## Privacy
 
 All conversions happen inside your browser. Nothing is collected, nothing is uploaded. The Service Worker only caches app code for offline use.

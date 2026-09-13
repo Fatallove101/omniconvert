@@ -742,7 +742,7 @@
           <div class="disclaimer-icon">🎵</div>
           <h3>使用须知</h3>
           <p>歌曲 / KGG 格式转换功能仅用于<b>个人学习与研究</b>，请支持正版音乐。</p>
-          <p>请确保仅对您拥有合法权利的音频文件进行操作；使用本功能产生的一切后果由使用者自行承担。</p>
+          <p>请确保仅对您拥有合法权利的音频文件进行操作；请勿用于批量分发、倒卖、牟利或规避付费授权；使用本功能产生的一切后果由使用者自行承担。完整合规说明见 README「合规与风险边界」。</p>
         <div class="disclaimer-btns">
           <button type="button" class="disclaimer-cancel">取消</button>
           <button type="button" class="disclaimer-ok">我已阅读并继续</button>
