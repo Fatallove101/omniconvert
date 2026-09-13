@@ -774,7 +774,7 @@
           <h3>需要该歌曲的 eKey 密钥</h3>
           <p>该文件为酷狗 KGG v5 加密，每首歌的密钥不同。</p>
           <p><b>方式一（推荐）：</b>选择密钥库文件自动提取。密钥库在登录过酷狗 PC 客户端并下载过这首歌的电脑上：<br>
-             <span class="kgg-path">%APPDATA%\\KuGou8\\KGMusicV3.db</span></p>
+             <span class="kgg-path">C:\Users\<用户名>\AppData\Roaming\KuGou8\KGMusicV3.db</span></p>
           <input type="file" id="kgg-db-input" accept=".db" />
           <div id="kgg-db-status" class="muted"></div>
           <p><b>方式二：</b>手动粘贴该歌曲的 eKey / EncryptionKey：</p>
@@ -814,28 +814,48 @@
         dbStatus.textContent = '检查解密模块…';
         try {
           /* 自愈：任何缺失的模块现场从服务器重新拉取执行（对抗旧缓存/加载失败） */
+          const diag = [];
           for (const [file, probe] of [
             ['/js/md5.js', () => App.md5],
             ['/js/aes.js', () => App.aesCbcDecryptNoPad],
             ['/js/kgg-db.js', () => App.decryptKggDb],
           ]) {
             if (typeof probe() !== 'function') {
-              const src = await (await fetch(file)).text();
-              new Function(src)();
+              try {
+                const res = await fetch(file);
+                diag.push(file + '=' + res.status);
+                if (!res.ok) throw new Error('获取 ' + file + ' 失败: ' + res.status);
+                const src = await res.text();
+                new Function(src)();
+                diag.push('eval=' + typeof probe());
+              } catch (e) {
+                diag.push(file + ' 错误: ' + (e.message || e));
+              }
             }
           }
           if (typeof App.decryptKggDb !== 'function') {
-            throw new Error('模块自愈失败，请 Ctrl+F5 强制刷新后重试');
+            throw new Error('模块自愈失败 [' + diag.join('; ') + ']，请 Ctrl+F5 强制刷新后重试');
           }
           dbStatus.textContent = '解密密钥库…';
           const bytes = new Uint8Array(await f.arrayBuffer());
           const dec = App.decryptKggDb(bytes);
-          const map = await App.extractKggKeyMapping(dec);
-          const total = Object.keys(map).length;
-          const ek = audioHash && map[audioHash];
+          let map = null;
+          let total = 0;
+          try {
+            map = await App.extractKggKeyMapping(dec);
+            total = Object.keys(map).length;
+          } catch (sqlErr) {
+            map = null;
+          }
+          let ek = audioHash && map && map[audioHash];
+          if (!ek) {
+            /* sql.js 提取失败/未命中时，直接在解密后的库里扫描密钥串（去掉 SQLite 引擎依赖） */
+            dbStatus.textContent = 'SQL 提取未命中，尝试直接扫描…';
+            ek = App.scanEkeyNear(dec, audioHash);
+          }
           if (ek) {
             input.value = ek;
-            dbStatus.textContent = `密钥库共 ${total} 条，已找到当前歌曲的密钥 ✓ 正在转换…`;
+            dbStatus.textContent = `已找到当前歌曲的密钥 ✓ ${total ? '密钥库共 ' + total + ' 条，' : '（扫描命中）'}正在转换…`;
             setTimeout(() => close(ek), 300);
           } else {
             dbStatus.textContent = `密钥库共 ${total} 条，但没有当前这首歌的密钥（请确认是在该客户端内下载的这首歌）`;

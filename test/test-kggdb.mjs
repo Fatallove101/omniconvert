@@ -66,8 +66,8 @@ const SQL = await sandbox.window.initSqlJs();
 const db = new SQL.Database();
 db.run('CREATE TABLE ShareFileItems (EncryptionKeyId TEXT, EncryptionKey TEXT);');
 const q1 = db.prepare('INSERT INTO ShareFileItems VALUES (?, ?);');
-q1.run(['hashAAA', 'ekeyAAA123']);
-q1.run(['hashBBB', 'ekeyBBB456']);
+q1.run(['hashAAA', 'ekeyAAA123abcdefgh12345678']);
+q1.run(['hashBBB', 'ekeyBBB456qrstuvwxyz98765432']);
 q1.free();
 const plainDb = new Uint8Array(db.export());
 db.close();
@@ -122,10 +122,22 @@ for (let page = 1; page <= pages; page++) {
 
 // 3d. 解密 + 提取
 const decDb = App.decryptKggDb(encDb);
+let firstDiff = -1;
+for (let i = 0; i < padded.length; i++) {
+  if (decDb[i] !== padded[i]) { firstDiff = i; break; }
+}
+console.log('FIRST_DIFF:', firstDiff < 0 ? 'none (byte-exact ✓)' : 'byte ' + firstDiff + ' (page ' + (Math.floor(firstDiff / 1024) + 1) + ' off ' + (firstDiff % 1024) + ') dec=' + decDb[firstDiff] + ' plain=' + padded[firstDiff]);
 check('DB sqlite header restored', new TextDecoder().decode(decDb.slice(0, 15)) === 'SQLite format 3');
 const mapping = await App.extractKggKeyMapping(decDb);
-check('DB key AAA', mapping['hashAAA'] === 'ekeyAAA123');
-check('DB key BBB', mapping['hashBBB'] === 'ekeyBBB456');
+check('DB key AAA', mapping['hashAAA'] === 'ekeyAAA123abcdefgh12345678');
+check('DB key BBB', mapping['hashBBB'] === 'ekeyBBB456qrstuvwxyz98765432');
+
+// 4. 扫描兜底（不依赖 sql.js）
+const scanA = App.scanEkeyNear(decDb, 'hashAAA');
+check('SCAN hashAAA', !!scanA && scanA.indexOf('ekeyAAA123') >= 0);
+const scanB = App.scanEkeyNear(decDb, 'hashBBB');
+check('SCAN hashBBB', !!scanB && scanB.indexOf('ekeyBBB456') >= 0);
+check('SCAN nope → null', App.scanEkeyNear(decDb, 'hashNOPE') === null);
 
 console.log(`RESULT: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

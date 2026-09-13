@@ -81,6 +81,50 @@
     return data;
   };
 
+  /** 兜底：不用 SQLite 引擎，直接在解密后的库里按 audio_hash 定位并扫描 eKey
+   *  （eKey 是 40+ 位的 base64 长串，通常紧邻其 EncryptionKeyId 存储） */
+  App.scanEkeyNear = function (dec, hash) {
+    if (!hash) return null;
+    const hb = new TextEncoder().encode(hash);
+    const isB64 = (c) =>
+      (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 43 || c === 47 || c === 61;
+    /* 定位 hash */
+    let at = -1;
+    outer: for (let i = 0; i <= dec.length - hb.length; i++) {
+      for (let j = 0; j < hb.length; j++) if (dec[i + j] !== hb[j]) continue outer;
+      at = i;
+      break;
+    }
+    if (at < 0) return null;
+    /* 在 hash 前后 1.5KB 窗口内收集所有 base64 长串（≥24），取起点离 hash 最近的一条 */
+    const from = Math.max(0, at - 1536);
+    const to = Math.min(dec.length, at + 1536);
+    const runs = [];
+    let run = 0;
+    let start = 0;
+    for (let k = from; k <= to; k++) {
+      const isB64 = k < to && ((dec[k] >= 48 && dec[k] <= 57) || (dec[k] >= 65 && dec[k] <= 90) || (dec[k] >= 97 && dec[k] <= 122) || dec[k] === 43 || dec[k] === 47 || dec[k] === 61);
+      if (isB64) {
+        if (run === 0) start = k;
+        run++;
+      } else if (run > 0) {
+        if (run >= 24) runs.push({ start, len: run });
+        run = 0;
+      }
+    }
+    if (!runs.length) return null;
+    let best = runs[0];
+    let bestDist = Math.abs(best.start - at);
+    for (const r of runs.slice(1)) {
+      const d = Math.abs(r.start - at);
+      if (d < bestDist) {
+        best = r;
+        bestDist = d;
+      }
+    }
+    return new TextDecoder().decode(dec.subarray(best.start, best.start + best.len));
+  };
+
   /** 从解密后的 SQLite 提取 { EncryptionKeyId: EncryptionKey } 映射（用 sql.js） */
   App.extractKggKeyMapping = function (sqliteBytes) {
     /* window.exports 垫片可能让 sql.js 的 UMD 把 initSqlJs 挂到 exports 上，两处都找 */

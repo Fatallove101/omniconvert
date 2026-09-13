@@ -1,0 +1,16 @@
+解密密钥库…';
+          const bytes = new Uint8Array(await f.arrayBuffer());
+          const dec = App.decryptKggDb(bytes);
+          const map = await App.extractKggKeyMapping(dec);
+          const total = Object.keys(map).length;
+          const ek = audioHash && map[audioHash];
+          if (ek) {
+            input.value = ek;
+            dbStatus.textContent = `密钥库共 ${total} 条，已找到当前歌曲的密钥 ✓ 正在转换…`;
+            setTimeout(() => close(ek), 300);
+          } else {
+            dbStatus.textContent = `密钥库共 ${total} 条，但没有当前这首歌的密钥（请确认是在该客户端内下载的这首歌）`;
+          }
+        } catch (e) {
+          dbStatus.textContent = '密钥库读取失败：' + (e.message || e) + '（页面版本 ' + (App.VERSION || '旧版-请强制刷新') + '）';
+      
