@@ -180,12 +180,16 @@
     return App._qpdfPromise;
   };
 
-  /** unlock-music WASM 懒加载（歌曲解密引擎），单例 */
+  /** unlock-music WASM（歌曲解密引擎）—— 经典脚本 loader-inline.js 已在页面加载，
+   *  通过 window.exports 暴露（见 index.html 的 shim），wasm 内联、无外部请求 */
   App.um = function () {
     if (!App._umPromise) {
       App._umPromise = (async () => {
-        const um = await import('/vendor/um/loader.mjs');
-        await um.ready;
+        const um = window.exports;
+        if (!um || !um.NCMFile) {
+          throw new Error('歌曲引擎脚本未加载，请刷新页面重试');
+        }
+        await Promise.resolve(um.ready);
         if (um.initPanicHook) um.initPanicHook();
         return um;
       })();

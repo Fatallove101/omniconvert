@@ -1,5 +1,5 @@
 /* 万象转换 Service Worker — 缓存应用外壳，支持离线使用 */
-const CACHE = 'omniconvert-v1.12';
+const CACHE = 'omniconvert-v1.13';
 const ASSETS = [
   './',
   'index.html',
@@ -17,8 +17,7 @@ const ASSETS = [
   'vendor/pdf.worker.min.js',
   'vendor/qpdf/qpdf.js',
   'vendor/qpdf/qpdf.wasm',
-  'vendor/um/loader.mjs',
-  'vendor/um/um_wasm_bg.wasm',
+  'vendor/um/loader-inline.js',
   'vendor/xlsx.full.min.js',
   'vendor/mammoth.browser.min.js',
   'vendor/marked.min.js',
