@@ -397,6 +397,7 @@
             <div class="dz-icon">📤</div>
             <div class="dz-main">${tool.multiple ? '点击选择文件，或拖拽到此处' : '点击选择文件，或拖拽到此处'}</div>
             <div class="dz-hint">支持：${tool.acceptText || tool.accept || '任意文件'} · 处理在本地完成</div>
+            ${tool.outputText ? `<div class="dz-out">可转出：${tool.outputText}</div>` : ''}
           </div>
           <ul id="file-list" class="file-list"></ul>
           ${tool.organize ? '<div id="organizer" class="organizer"></div>' : ''}

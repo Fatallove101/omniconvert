@@ -32,6 +32,10 @@ async function main() {
     console.log('PAGE:', JSON.stringify(before.result && before.result.result && before.result.result.value));
     const sw = await ev('navigator.serviceWorker.getRegistrations().then(r => "SW_COUNT:" + r.length)');
     console.log('SW:', JSON.stringify(sw.result && sw.result.result && sw.result.result.value));
+    const engine = await ev(
+      '(async () => { if (!window.App) return "NO_APP"; try { const u = await window.App.um(); return "ENGINE_OK NCMFile=" + typeof u.NCMFile + " QMC2=" + typeof u.QMC2 + " KuGou=" + typeof u.KuGou; } catch (e) { return "ENGINE_ERR: " + (e.message || e); } })()'
+    );
+    console.log('ENGINE:', JSON.stringify(engine.result && engine.result.result && engine.result.result.value));
     process.exit(0);
   };
   ws.onerror = () => {

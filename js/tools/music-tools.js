@@ -146,6 +146,7 @@
     category: 'music',
     accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kgm,.kgma,.vpr,.kwm',
     acceptText: 'ncm / qmc* / mflac / mgg / kgm / kgma / vpr / kwm',
+    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（原文件是 FLAC 就输出 FLAC）',
     multiple: true,
     minFiles: 1,
     async run(files, opts, ctx) {
