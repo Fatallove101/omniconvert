@@ -94,7 +94,13 @@
     const h = App.KGG.parseHeader(buf.subarray(0, 0x400));
 
     if (h.version >= 5) {
-      throw new Error('该文件为 KGG v5 加密：需要酷狗客户端的 KGMusicV3.db 密钥库，暂不支持');
+      throw new Error(
+        '该文件为 KGG v5 加密（酷狗新版）。解密需要你自己电脑上酷狗客户端的密钥库 KGMusicV3.db，获取步骤：' +
+        '① 在本机安装并登录酷狗音乐 PC 客户端；' +
+        '② 在客户端内用你的账号下载这首歌（密钥只对你自己下载过的歌有效）；' +
+        '③ 复制 C:\\Users\\你的用户名\\AppData\\Roaming\\KuGou8\\KGMusicV3.db 文件。' +
+        '当前版本暂未支持 v5 自动读取密钥库，请将 KGMusicV3.db 提供给开发者以启用支持。仅限处理你自己账号下载的歌曲，请支持正版。'
+      );
     }
     if (h.version >= 3) {
       const pubKey = await App.KGG.loadPubKey();
