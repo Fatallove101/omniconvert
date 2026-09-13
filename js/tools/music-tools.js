@@ -55,9 +55,9 @@
     mgg1: 1,
   };
 
-  /* 两个工具各自接受的扩展名 */
-  const MUSIC_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'mflac', 'mgg', 'mgg1', 'kwm'];
-  const KGG_EXTS = ['kgg', 'kgma', 'kgm', 'vpr'];
+  /* 两个工具各自接受的扩展名：老酷狗加密(kgm/kgma/vpr)归歌曲转换，仅 .kgg 独立 */
+  const MUSIC_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'mflac', 'mgg', 'mgg1', 'kwm', 'kgm', 'kgma', 'vpr'];
+  const KGG_EXTS = ['kgg'];
 
   function extOf(name) {
     const m = name.match(/\.([a-z0-9]+)$/i);
@@ -258,16 +258,16 @@
     return results;
   }
 
-  /* ---------- 歌曲格式转换（网易云 / QQ音乐 / 酷我） ---------- */
+  /* ---------- 歌曲格式转换（网易云 / QQ音乐 / 酷我 / 酷狗老格式） ---------- */
   App.registerTool({
     id: 'music-decrypt',
     icon: '🎵',
     name: '歌曲格式转换',
-    desc: '网易云 / QQ音乐 / 酷我 加密歌曲转 MP3 / FLAC / OGG',
-    keywords: 'ncm qmc mflac mgg kwm 网易云音乐 qq音乐 酷我 歌曲格式转换 转换 音乐',
+    desc: '网易云 / QQ音乐 / 酷我 / 酷狗老格式(KGM·KGMA·VPR) 加密歌曲转 MP3 / FLAC / OGG',
+    keywords: 'ncm qmc mflac mgg kwm kgm kgma vpr 网易云音乐 qq音乐 酷我 酷狗 歌曲格式转换 转换 音乐',
     category: 'music',
-    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kwm',
-    acceptText: 'ncm / qmc* / mflac / mgg / kwm',
+    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kwm,.kgm,.kgma,.vpr',
+    acceptText: 'ncm / qmc* / mflac / mgg / kwm / kgm / kgma / vpr',
     outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（原文件是 FLAC 就输出 FLAC）',
     multiple: true,
     minFiles: 1,
@@ -276,16 +276,16 @@
     },
   });
 
-  /* ---------- KGG 格式转换（酷狗专区） ---------- */
+  /* ---------- KGG 格式转换（酷狗最新 .kgg 格式专区） ---------- */
   App.registerTool({
     id: 'kgg-convert',
     icon: '🐶',
     name: 'KGG 格式转换',
-    desc: '酷狗 KGG / KGMA / KGM / VPR 加密歌曲转 MP3 / FLAC / OGG',
-    keywords: 'kgg kgm kgma vpr 酷狗 kugou 歌曲格式转换 转换 音乐',
+    desc: '酷狗最新 .kgg 加密歌曲转 MP3 / FLAC / OGG（v3 离线直解；v5 按提示提供 eKey）',
+    keywords: 'kgg 酷狗 kugou 歌曲格式转换 转换 音乐',
     category: 'music',
-    accept: '.kgg,.kgma,.kgm,.vpr',
-    acceptText: 'kgg / kgma / kgm / vpr',
+    accept: '.kgg',
+    acceptText: 'kgg（酷狗最新格式）',
     outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（v5 需按提示提供 eKey）',
     multiple: true,
     minFiles: 1,
