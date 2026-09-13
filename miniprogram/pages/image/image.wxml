@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="panel">
+    <view class="opt-group">
+      <view class="opt-label">目标格式</view>
+      <view class="seg">
+        <view class="seg-item {{format === 'jpg' ? 'active' : ''}}" data-fmt="jpg" bindtap="onFormatChange">JPG</view>
+        <view class="seg-item {{format === 'png' ? 'active' : ''}}" data-fmt="png" bindtap="onFormatChange">PNG</view>
+      </view>
+    </view>
+
+    <view class="opt-group" wx:if="{{format === 'jpg'}}">
+      <view class="opt-label">画质 <text class="muted">{{quality}}</text></view>
+      <slider min="30" max="100" step="5" value="{{quality}}" activeColor="#4f46e5" bindchange="onQualityChange" />
+    </view>
+
+    <view class="opt-group">
+      <view class="opt-label">缩放 <text class="muted">{{scale}}%</text></view>
+      <slider min="10" max="200" step="5" value="{{scale}}" activeColor="#4f46e5" bindchange="onScaleChange" />
+    </view>
+
+    <button class="primary-btn" bindtap="chooseImages" disabled="{{busy}}">选择图片并转换</button>
+    <view class="status">{{status}}</view>
+  </view>
+
+  <view class="panel" wx:if="{{items.length}}">
+    <view class="results-head">
+      <text class="results-title">转换结果（{{items.length}}）</text>
+      <text class="save-link" bindtap="saveAll">全部保存到相册</text>
+    </view>
+    <view class="result-item" wx:for="{{items}}" wx:key="index">
+      <image class="thumb" src="{{item.outPath}}" mode="aspectFill" data-path="{{item.outPath}}" bindtap="preview" />
+      <view class="result-info">
+        <view>{{item.outW}} × {{item.outH}}</view>
+        <view class="muted">{{item.srcSize}} B → {{item.outSize}} B</view>
+      </view>
+      <view class="save-link" data-path="{{item.outPath}}" bindtap="preview">预览</view>
+    </view>
+  </view>
+
+  <canvas type="2d" id="work-canvas" class="work-canvas"></canvas>
+</view>

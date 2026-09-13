@@ -1,0 +1,40 @@
+/* 万象转换小程序 — 全局样式 */
+page {
+  background: #f4f6fb;
+  color: #1e2235;
+  font-size: 28rpx;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin: 20rpx 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(16, 24, 40, 0.06);
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  border-radius: 20rpx;
+  font-weight: 700;
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 32rpx;
+}
+.primary-btn[disabled] {
+  opacity: 0.5;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.status {
+  color: #6b7280;
+  font-size: 26rpx;
+  text-align: center;
+  margin-top: 16rpx;
+  min-height: 36rpx;
+}

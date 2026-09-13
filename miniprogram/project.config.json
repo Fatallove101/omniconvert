@@ -1,0 +1,19 @@
+{
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "omniconvert-miniprogram",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "libVersion": "3.4.10",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": true,
+    "packNpmManually": false
+  },
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  }
+}

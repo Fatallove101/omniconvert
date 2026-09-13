@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/image/image",
+    "pages/pdf/pdf"
+  ],
+  "window": {
+    "navigationBarTitleText": "万象转换",
+    "navigationBarBackgroundColor": "#4f46e5",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f4f6fb"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

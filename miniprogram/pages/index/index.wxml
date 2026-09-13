@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="hero">
+    <view class="hero-badge">🔒 转换在手机本地完成，文件不上传</view>
+    <view class="hero-title">万象转换</view>
+  </view>
+
+  <view
+    wx:for="{{tools}}"
+    wx:key="id"
+    class="tool-card"
+    data-url="{{item.url}}"
+    bindtap="onTapTool"
+  >
+    <view class="tool-icon">{{item.icon}}</view>
+    <view class="tool-text">
+      <view class="tool-name">{{item.name}}</view>
+      <view class="tool-desc muted">{{item.desc}}</view>
+    </view>
+    <view class="tool-arrow">›</view>
+  </view>
+</view>

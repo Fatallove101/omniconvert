@@ -1,0 +1,10 @@
+{
+  "name": "convert",
+  "version": "0.1.0",
+  "description": "万象转换云函数：PDF 转图片等重型转换",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "pdf-lib": "^1.17.1"
+  }
+}

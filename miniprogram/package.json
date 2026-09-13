@@ -1,0 +1,8 @@
+{
+  "name": "omniconvert-miniprogram",
+  "version": "0.1.0",
+  "description": "万象转换小程序端：图片转换端内完成，PDF 重活走云函数",
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}

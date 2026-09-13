@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="panel">
+    <view class="opt-group">
+      <view class="opt-label">功能</view>
+      <view class="seg">
+        <view class="seg-item {{mode === 'merge' ? 'active' : ''}}" data-mode="merge" bindtap="onModeChange">合并</view>
+        <view class="seg-item {{mode === 'split' ? 'active' : ''}}" data-mode="split" bindtap="onModeChange">拆分</view>
+      </view>
+      <view class="muted tip">
+        {{mode === 'merge' ? '从聊天记录中选择 2-9 个 PDF，按顺序合并' : '从聊天记录中选择 1 个 PDF，按页拆分'}}
+      </view>
+    </view>
+
+    <button class="primary-btn" bindtap="chooseFiles" disabled="{{busy}}">选择 PDF 文件</button>
+
+    <view class="file-item" wx:for="{{files}}" wx:key="path">
+      <view class="file-name">{{item.name}}</view>
+      <view class="file-remove" data-i="{{index}}" bindtap="removeFile">✕</view>
+    </view>
+
+    <button class="primary-btn" bindtap="run" disabled="{{busy || !files.length}}" style="margin-top: 24rpx;">开始转换</button>
+    <view class="status">{{status}}</view>
+  </view>
+
+  <view class="panel" wx:if="{{results.length}}">
+    <view class="results-title">结果（{{results.length}}）</view>
+    <view class="result-item" wx:for="{{results}}" wx:key="*this">
+      <view class="file-name">输出文件 {{index + 1}}</view>
+      <view class="op" data-path="{{item}}" bindtap="open">打开</view>
+      <view class="op" data-path="{{item}}" bindtap="share">发送</view>
+    </view>
+  </view>
+</view>
