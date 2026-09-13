@@ -41,12 +41,18 @@ try {
 }
 Write-Host "Release URL: $($rel.html_url)"
 
-# ---------- 3. 上传资源 ----------
+# ---------- 3. 删除同名旧附件后上传 ----------
 function Upload($path, $name) {
   $size = [math]::Round((Get-Item $path).Length / 1MB, 1)
   $up = $rel.upload_url.Split('{')[0] + "?name=$name"
   Invoke-RestMethod -Method Post -Headers $headers -ContentType 'application/octet-stream' -InFile $path -Uri $up | Out-Null
   Write-Host "已上传: $name（$size MB）"
+}
+
+$existing = Invoke-RestMethod -Headers $headers "https://api.github.com/repos/$repo/releases/$($rel.id)/assets"
+foreach ($old in $existing) {
+  Invoke-RestMethod -Method Delete -Headers $headers "https://api.github.com/repos/$repo/releases/assets/$($old.id)" | Out-Null
+  Write-Host "已删除旧附件: $($old.name)"
 }
 
 $relRoot = 'C:\1\omniconvert\src-tauri\target\release'

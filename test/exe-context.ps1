@@ -1,4 +1,7 @@
-﻿# 查看 exe 中 26951 / C-Users 的出现位置与上下文
+﻿# 查看 exe 构建产物中的用户名 / 路径出现位置与上下文
+# 默认排查当前系统登录用户名；用法：-File exe-context.ps1 [-User <用户名>]
+param([string]$User = $env:USERNAME)
+if (-not $User) { $User = 'UNKNOWN_USER' }
 $exe = 'C:\1\omniconvert\src-tauri\target\release\omniconvert.exe'
 $bytes = [IO.File]::ReadAllBytes($exe)
 $s = [Text.Encoding]::ASCII.GetString($bytes)
@@ -19,5 +22,5 @@ function ShowContext([string]$label, [string]$needle, [int]$max) {
   }
 }
 
-ShowContext 'USER26951' '26951' 10
+ShowContext ('USER(' + $User + ')') $User 10
 ShowContext 'USERS-PATH' 'C:\Users\' 10

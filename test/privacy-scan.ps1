@@ -1,8 +1,12 @@
 ﻿# 隐私扫描：被跟踪文件 / Git 历史 / Release 二进制
+# 用法：powershell -ExecutionPolicy Bypass -File privacy-scan.ps1 [-User <要排查的用户名>]
+# 默认扫描当前系统登录用户名（本文件不硬编码任何用户名）
+param([string]$User = $env:USERNAME)
 $ErrorActionPreference = 'Continue'
 $git = 'C:\Program Files\Git\cmd\git.exe'
 $root = 'C:\1\omniconvert'
 Set-Location $root
+if (-not $User) { $User = 'UNKNOWN_USER' }
 
 $hits = New-Object System.Collections.Generic.List[string]
 
@@ -12,10 +16,10 @@ foreach ($f in $files) {
   $full = Join-Path $root $f
   if (-not (Test-Path $full)) { continue }
   $t = [IO.File]::ReadAllText($full)
-  if ($t -match '26951') { $hits.Add("$f => 用户名 26951") }
+  if ($t.Contains($User)) { $hits.Add("$f => 用户名 $User") }
   foreach ($m in [regex]::Matches($t, 'C:\\\\Users\\\\[^\s"''<>)，。]+')) {
     $v = $m.Value
-    if ($v -notmatch '用户名') { $hits.Add("$f => 路径 $v") }
+    if ($v -notmatch [regex]::Escape($User) -and $v -notmatch '用户名') { $hits.Add("$f => 路径 $v") }
   }
   foreach ($m in [regex]::Matches($t, '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')) {
     if ($m.Value -notmatch 'local\.dev') { $hits.Add("$f => 邮箱 $($m.Value)") }
@@ -30,10 +34,10 @@ $log = & $git log --format='%an|%ae|%s' --all
 foreach ($line in $log) {
   $p = $line -split '\|', 2
   if ($p[1] -notmatch 'local\.dev') { $hits.Add("git历史 => 作者邮箱 $($p[1])") }
-  foreach ($m in [regex]::Matches($line, '26951')) { $hits.Add("git历史 => 提交信息含 26951: $($p[2])") }
+  if ($line.Contains($User)) { $hits.Add("git历史 => 提交信息含用户名: $line") }
 }
 
-# ---------- 3. Release 二进制（用户名字符串） ----------
+# ---------- 3. Release 二进制（用户名字符串，ASCII + UTF16） ----------
 foreach ($exe in @(
   "$root\src-tauri\target\release\omniconvert.exe",
   "$root\src-tauri\target\release\bundle\nsis\万象转换_0.2.1_x64-setup.exe"
@@ -41,10 +45,9 @@ foreach ($exe in @(
   if (Test-Path $exe) {
     $bytes = [IO.File]::ReadAllBytes($exe)
     $s = [Text.Encoding]::ASCII.GetString($bytes)
-    if ($s.Contains('26951')) { $hits.Add("$(Split-Path -Leaf $exe) => 二进制含 26951") }
-    if ($s.Contains('C:\Users\')) { $hits.Add("$(Split-Path -Leaf $exe) => 二进制含 C:\Users\ 路径") }
     $u16 = [Text.Encoding]::Unicode.GetString($bytes)
-    if ($u16.Contains('26951')) { $hits.Add("$(Split-Path -Leaf $exe) => 二进制(UTF16)含 26951") }
+    if ($s.Contains($User) -or $u16.Contains($User)) { $hits.Add("$(Split-Path -Leaf $exe) => 二进制含用户名 $User") }
+    if ($s.Contains('C:\Users\')) { $hits.Add("$(Split-Path -Leaf $exe) => 二进制含 C:\Users\ 路径") }
   }
 }
 
