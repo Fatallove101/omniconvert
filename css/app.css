@@ -186,6 +186,23 @@
 }
 .disclaimer-btns .disclaimer-ok:hover { filter: brightness(1.06); }
 
+/* ---------- eKey 输入 ---------- */
+.kgg-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-family: Consolas, monospace;
+  margin-top: 10px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+}
+.kgg-input:focus { border-color: var(--primary); }
+.kgg-input-err { border-color: var(--err); }
+.disclaimer-card .muted { font-size: 12px; }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -574,6 +591,7 @@ html.dark .page-thumb { background: #0b0e1a; }
 html.dark .page-btns button { background: var(--card); border-color: var(--line); color: var(--text); }
 html.dark .result-dl.ghost { background: rgba(99, 102, 241, 0.15); color: var(--primary); }
 html.dark .disclaimer-btns button { background: rgba(255, 255, 255, 0.05); border-color: var(--line); color: var(--text); }
+html.dark .kgg-input { background: #10131f; border-color: var(--line); color: var(--text); }
 html.dark .recent-chip { background: var(--card); border-color: var(--line); }
 html.dark .theme-btn { background: var(--card); border-color: var(--line); }
 html.dark .preview-drawer { box-shadow: -8px 0 32px rgba(0, 0, 0, 0.55); }

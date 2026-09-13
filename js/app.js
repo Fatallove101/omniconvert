@@ -758,6 +758,54 @@
     });
   };
 
+  /** KGG v5 eKey 输入弹窗：返回 Promise<string|null>（取消返回 null） */
+  App.askKggEkey = function (audioHash) {
+    return new Promise((resolve) => {
+      const old = App.$('#kgg-key-mask');
+      if (old) old.remove();
+      const mask = document.createElement('div');
+      mask.id = 'kgg-key-mask';
+      mask.className = 'disclaimer-mask';
+      mask.innerHTML = `
+        <div class="disclaimer-card">
+          <div class="disclaimer-icon">🔑</div>
+          <h3>需要该歌曲的 eKey 密钥</h3>
+          <p>该文件为酷狗 KGG v5 加密，每首歌的密钥不同。获取方法：</p>
+          <p>① 在本机安装并登录<b>酷狗音乐 PC 客户端</b>；<br>
+             ② 在客户端内用你的账号下载这首歌（密钥只对你自己下载过的歌有效）；<br>
+             ③ 用密钥提取工具（如 TriAgent）从 KGMusicV3.db 中取出该歌曲的 EncryptionKey，粘贴到下方。</p>
+          ${audioHash ? `<p class="muted">本文件音频标识（audio_hash）：${audioHash}</p>` : ''}
+          <input type="text" id="kgg-ekey-input" class="kgg-input" placeholder="粘贴该歌曲的 eKey / EncryptionKey" autocomplete="off" spellcheck="false" />
+          <p class="muted">仅限转换你自己账号下载的歌曲，请支持正版。</p>
+          <div class="disclaimer-btns">
+            <button type="button" class="disclaimer-cancel">取消</button>
+            <button type="button" class="disclaimer-ok">开始转换</button>
+          </div>
+        </div>`;
+      document.body.appendChild(mask);
+      const input = mask.querySelector('#kgg-ekey-input');
+      const close = (v) => {
+        mask.remove();
+        resolve(v);
+      };
+      const submit = () => {
+        const v = input.value.trim();
+        if (!v) {
+          input.classList.add('kgg-input-err');
+          input.placeholder = '密钥不能为空';
+          return;
+        }
+        close(v);
+      };
+      mask.querySelector('.disclaimer-ok').addEventListener('click', submit);
+      mask.querySelector('.disclaimer-cancel').addEventListener('click', () => close(null));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submit();
+      });
+      setTimeout(() => input.focus(), 50);
+    });
+  };
+
   App.runTool = async function (id) {
     const tool = App.getTool(id);
     if (App.state.busy || !App.state.files.length) return;

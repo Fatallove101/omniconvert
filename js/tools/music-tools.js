@@ -94,13 +94,10 @@
     const h = App.KGG.parseHeader(buf.subarray(0, 0x400));
 
     if (h.version >= 5) {
-      throw new Error(
-        '该文件为 KGG v5 加密（酷狗新版）。解密需要你自己电脑上酷狗客户端的密钥库 KGMusicV3.db，获取步骤：' +
-        '① 在本机安装并登录酷狗音乐 PC 客户端；' +
-        '② 在客户端内用你的账号下载这首歌（密钥只对你自己下载过的歌有效）；' +
-        '③ 复制 C:\\Users\\你的用户名\\AppData\\Roaming\\KuGou8\\KGMusicV3.db 文件。' +
-        '当前版本暂未支持 v5 自动读取密钥库，请将 KGMusicV3.db 提供给开发者以启用支持。仅限处理你自己账号下载的歌曲，请支持正版。'
-      );
+      /* v5：需要该歌曲的 eKey。抛出特殊错误，由 run() 弹出输入窗口走手动密钥流程 */
+      const err = new Error('该文件为 KGG v5 加密，需要该歌曲的 eKey 密钥');
+      err.needEkey = { hash: h.audioHash, audioOffset: h.audioOffset, buf, name: f.name };
+      throw err;
     }
     if (h.version >= 3) {
       const pubKey = await App.KGG.loadPubKey();
@@ -217,7 +214,33 @@
             blob: new Blob([out], { type: MIME[ext] || 'application/octet-stream' }),
           });
         } catch (e) {
-          failures.push(`${f.name}：${e.message || e}`);
+          if (e && e.needEkey) {
+            /* KGG v5：弹出 eKey 输入窗口，用户手动提供密钥 */
+            const ne = e.needEkey;
+            const ekey = await App.askKggEkey(ne.hash);
+            if (!ekey) {
+              failures.push(`${f.name}：未提供 eKey，已跳过`);
+            } else {
+              try {
+                const cipher = new um.QMC2(ekey);
+                const body = ne.buf.slice(ne.audioOffset);
+                cipher.decrypt(body, 0);
+                const det = detectExt(um, body);
+                if (!det) {
+                  throw new Error('eKey 不正确：转换后无法识别音频格式，请核对密钥');
+                }
+                results.push({
+                  name: `${baseOf(f.name)}.${det}`,
+                  blob: new Blob([body], { type: MIME[det] || 'application/octet-stream' }),
+                });
+                ctx.setStatus(`${f.name} 转换成功（使用手动提供的 eKey）`, true);
+              } catch (e2) {
+                failures.push(`${f.name}：${e2.message || e2}`);
+              }
+            }
+          } else {
+            failures.push(`${f.name}：${e.message || e}`);
+          }
         }
         ctx.setProgress((i + 0.9) / files.length);
         await App.nextFrame();
