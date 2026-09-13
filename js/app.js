@@ -6,6 +6,7 @@
   'use strict';
 
   const App = {
+    VERSION: 'v1.21',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -825,7 +826,7 @@
             dbStatus.textContent = `密钥库共 ${total} 条，但没有当前这首歌的密钥（请确认是在该客户端内下载的这首歌）`;
           }
         } catch (e) {
-          dbStatus.textContent = '密钥库读取失败：' + (e.message || e);
+          dbStatus.textContent = '密钥库读取失败：' + (e.message || e) + '（页面版本 ' + (App.VERSION || '旧版-请强制刷新') + '）';
         }
       });
       setTimeout(() => input.focus(), 50);
