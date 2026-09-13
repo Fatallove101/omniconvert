@@ -1,0 +1,11 @@
+# 本地临时输出
+test/output/
+*.log
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+
+# 编辑器
+.vscode/
+.idea/

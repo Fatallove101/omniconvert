@@ -1,0 +1,17 @@
+{
+  "name": "万象转换 OmniConvert",
+  "short_name": "万象转换",
+  "description": "浏览器本地文件格式转换：PDF、图片、Office 文档。文件永不上传。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6fb",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
