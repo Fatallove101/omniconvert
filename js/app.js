@@ -15,6 +15,7 @@
       { id: 'image', label: '图片', icon: '🖼️' },
       { id: 'doc', label: '文档', icon: '📄' },
       { id: 'music', label: '歌曲转换', icon: '🎵' },
+      { id: 'kgg', label: 'KGG转换', icon: '🐶' },
     ],
     filter: { cat: 'all', q: '' },
   };
@@ -339,8 +340,8 @@
     const tool = App.getTool(id);
     App.state = { toolId: id, files: [], results: [], busy: false };
     document.title = `${tool.name} — 万象转换`;
-    /* 歌曲转换类工具：进入前先弹使用须知 */
-    if (tool.category === 'music') {
+    /* 歌曲转换 / KGG 转换类工具：进入前先弹使用须知 */
+    if (tool.category === 'music' || tool.category === 'kgg') {
       App.showMusicDisclaimer(null, () => {
         location.hash = '#/';
       });
@@ -737,12 +738,12 @@
     const mask = document.createElement('div');
     mask.id = 'disclaimer-mask';
     mask.className = 'disclaimer-mask';
-    mask.innerHTML = `
-      <div class="disclaimer-card">
-        <div class="disclaimer-icon">🎵</div>
-        <h3>使用须知</h3>
-        <p>歌曲格式转换功能仅用于<b>个人学习与研究</b>，请支持正版音乐。</p>
-        <p>请确保仅对您拥有合法权利的音频文件进行操作；使用本功能产生的一切后果由使用者自行承担。</p>
+      mask.innerHTML = `
+        <div class="disclaimer-card">
+          <div class="disclaimer-icon">🎵</div>
+          <h3>使用须知</h3>
+          <p>歌曲 / KGG 格式转换功能仅用于<b>个人学习与研究</b>，请支持正版音乐。</p>
+          <p>请确保仅对您拥有合法权利的音频文件进行操作；使用本功能产生的一切后果由使用者自行承担。</p>
         <div class="disclaimer-btns">
           <button type="button" class="disclaimer-cancel">取消</button>
           <button type="button" class="disclaimer-ok">我已阅读并继续</button>

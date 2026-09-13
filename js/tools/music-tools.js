@@ -1,6 +1,9 @@
 /* ============================================================
- * 歌曲解密 — NCM / QMC / KGM / KWM → MP3 / FLAC / OGG
+ * 歌曲转换工具组
+ * - 歌曲格式转换：NCM(网易云) / QMC·MFLAC·MGG(QQ音乐) / KWM(酷我)
+ * - KGG 格式转换：KGG / KGMA / KGM / VPR(酷狗)
  * 引擎：unlock-music WASM（@clamber_l/crypto，MIT/Apache-2.0）
+ *      + 内置 KGG v3 解码器（移植自 TriAgent，GPL-3.0）
  * 说明：只做"解密还原"（去掉加密壳，得到原本的音频文件），
  *       不做有损转码（如 flac→mp3 需要音频编码器，见路线图）。
  * ============================================================ */
@@ -34,6 +37,7 @@
     mgg1: 'ogg',
     kgm: 'mp3',
     kgma: 'flac',
+    kgg: 'flac',
     vpr: 'flac',
     kwm: 'mp3',
   };
@@ -50,6 +54,10 @@
     mgg: 1,
     mgg1: 1,
   };
+
+  /* 两个工具各自接受的扩展名 */
+  const MUSIC_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'mflac', 'mgg', 'mgg1', 'kwm'];
+  const KGG_EXTS = ['kgg', 'kgma', 'kgm', 'vpr'];
 
   function extOf(name) {
     const m = name.match(/\.([a-z0-9]+)$/i);
@@ -88,7 +96,7 @@
 
   /** KGM / KGMA / VPR / KGG（酷狗）：按头部版本分流
    *  v1/v2 → unlock-music WASM；v3 → 内置 KGG v3 解码器（离线公钥）；
-   *  v5 → 需要酷狗客户端的 KGMusicV3.db 密钥库（暂不支持，明确报错） */
+   *  v5 → 需要该歌曲的 eKey（弹窗让用户输入或选密钥库） */
   async function decKGM(um, buf, name) {
     if (buf.length < 0x40) throw new Error('文件太小，不是有效的酷狗加密文件');
     const h = App.KGG.parseHeader(buf.subarray(0, 0x400));
@@ -169,93 +177,120 @@
     kwm: decKWM,
   };
 
+  /** 公共批量解密循环：allowedExts 限定该工具处理的扩展名 */
+  async function runDecrypt(files, ctx, allowedExts) {
+    let um;
+    try {
+      um = await App.um();
+    } catch (e) {
+      throw new Error('转换引擎加载失败：' + (e.message || e));
+    }
+
+    const results = [];
+    const failures = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const extIn = extOf(f.name);
+      ctx.setStatus(`转换 ${f.name}（${i + 1}/${files.length}）…`);
+      ctx.setProgress((i + 0.25) / files.length);
+      try {
+        const fn = ROUTE[extIn];
+        if (!fn) throw new Error('暂不支持该扩展名');
+        if (!allowedExts.includes(extIn)) {
+          throw new Error('该格式请在「' + (allowedExts.includes('ncm') ? '歌曲格式转换' : 'KGG 格式转换') + '」工具中处理');
+        }
+        const buf = new Uint8Array(await App.readAsArrayBuffer(f));
+        const out = await fn(um, buf, f.name);
+        if (!out || !out.length) throw new Error('转换结果为空');
+        const det = detectExt(um, out);
+        let ext = det || FALLBACK_EXT[extIn] || null;
+        /* 输出自检：识别不出音频类型的，明确报错而不是输出损坏文件 */
+        if (!ext || (!det && !TRUST_FALLBACK[extIn])) {
+          throw new Error('转换后无法识别音频格式——该加密变体可能不支持离线转换（如酷狗新版 KGMA v3+，需要联网获取每首歌的密钥）');
+        }
+        results.push({
+          name: `${baseOf(f.name)}.${ext}`,
+          blob: new Blob([out], { type: MIME[ext] || 'application/octet-stream' }),
+        });
+      } catch (e) {
+        if (e && e.needEkey) {
+          /* KGG v5：弹出 eKey 输入窗口，用户手动提供密钥 */
+          const ne = e.needEkey;
+          const ekey = await App.askKggEkey(ne.hash);
+          if (!ekey) {
+            failures.push(`${f.name}：未提供 eKey，已跳过`);
+          } else {
+            try {
+              const cipher = new um.QMC2(ekey);
+              const body = ne.buf.slice(ne.audioOffset);
+              cipher.decrypt(body, 0);
+              const det = detectExt(um, body);
+              if (!det) {
+                throw new Error('eKey 不正确：转换后无法识别音频格式，请核对密钥');
+              }
+              results.push({
+                name: `${baseOf(f.name)}.${det}`,
+                blob: new Blob([body], { type: MIME[det] || 'application/octet-stream' }),
+              });
+              ctx.setStatus(`${f.name} 转换成功（使用手动提供的 eKey）`, true);
+            } catch (e2) {
+              failures.push(`${f.name}：${e2.message || e2}`);
+            }
+          }
+        } else {
+          failures.push(`${f.name}：${e.message || e}`);
+        }
+      }
+      ctx.setProgress((i + 0.9) / files.length);
+      await App.nextFrame();
+    }
+
+    if (!results.length) {
+      throw new Error(failures.length ? failures.join('；') : '没有可转换的文件');
+    }
+    ctx.setStatus(
+      failures.length
+        ? `成功 ${results.length} 个，失败 ${failures.length} 个 —— ${failures.join('；')}`
+        : `全部转换成功（共 ${results.length} 个）`,
+      true
+    );
+    return results;
+  }
+
+  /* ---------- 歌曲格式转换（网易云 / QQ音乐 / 酷我） ---------- */
   App.registerTool({
     id: 'music-decrypt',
     icon: '🎵',
     name: '歌曲格式转换',
-    desc: '网易云 / QQ音乐 / 酷狗(KGM/KGMA/KGG) / 酷我 加密歌曲转 MP3 / FLAC / OGG',
-    keywords: 'ncm qmc kgm kgma vpr kgg kwm mflac mgg 网易云音乐 qq音乐 酷狗 酷我 歌曲格式转换 转换 音乐',
+    desc: '网易云 / QQ音乐 / 酷我 加密歌曲转 MP3 / FLAC / OGG',
+    keywords: 'ncm qmc mflac mgg kwm 网易云音乐 qq音乐 酷我 歌曲格式转换 转换 音乐',
     category: 'music',
-    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kgm,.kgma,.kgg,.vpr,.kwm',
-    acceptText: 'ncm / qmc* / mflac / mgg / kgm / kgma / kgg / vpr / kwm',
+    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kwm',
+    acceptText: 'ncm / qmc* / mflac / mgg / kwm',
     outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（原文件是 FLAC 就输出 FLAC）',
     multiple: true,
     minFiles: 1,
     async run(files, opts, ctx) {
-      let um;
-      try {
-        um = await App.um();
-      } catch (e) {
-        throw new Error('转换引擎加载失败：' + (e.message || e));
-      }
+      return runDecrypt(files, ctx, MUSIC_EXTS);
+    },
+  });
 
-      const results = [];
-      const failures = [];
-
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        const extIn = extOf(f.name);
-        ctx.setStatus(`转换 ${f.name}（${i + 1}/${files.length}）…`);
-        ctx.setProgress((i + 0.25) / files.length);
-        try {
-          const fn = ROUTE[extIn];
-          if (!fn) throw new Error('暂不支持该扩展名');
-          const buf = new Uint8Array(await App.readAsArrayBuffer(f));
-          const out = await fn(um, buf, f.name);
-          if (!out || !out.length) throw new Error('转换结果为空');
-          const det = detectExt(um, out);
-          let ext = det || FALLBACK_EXT[extIn] || null;
-          /* 输出自检：识别不出音频类型的，明确报错而不是输出损坏文件 */
-          if (!ext || (!det && !TRUST_FALLBACK[extIn])) {
-            throw new Error('转换后无法识别音频格式——该加密变体可能不支持离线转换（如酷狗新版 KGMA v3+，需要联网获取每首歌的密钥）');
-          }
-          results.push({
-            name: `${baseOf(f.name)}.${ext}`,
-            blob: new Blob([out], { type: MIME[ext] || 'application/octet-stream' }),
-          });
-        } catch (e) {
-          if (e && e.needEkey) {
-            /* KGG v5：弹出 eKey 输入窗口，用户手动提供密钥 */
-            const ne = e.needEkey;
-            const ekey = await App.askKggEkey(ne.hash);
-            if (!ekey) {
-              failures.push(`${f.name}：未提供 eKey，已跳过`);
-            } else {
-              try {
-                const cipher = new um.QMC2(ekey);
-                const body = ne.buf.slice(ne.audioOffset);
-                cipher.decrypt(body, 0);
-                const det = detectExt(um, body);
-                if (!det) {
-                  throw new Error('eKey 不正确：转换后无法识别音频格式，请核对密钥');
-                }
-                results.push({
-                  name: `${baseOf(f.name)}.${det}`,
-                  blob: new Blob([body], { type: MIME[det] || 'application/octet-stream' }),
-                });
-                ctx.setStatus(`${f.name} 转换成功（使用手动提供的 eKey）`, true);
-              } catch (e2) {
-                failures.push(`${f.name}：${e2.message || e2}`);
-              }
-            }
-          } else {
-            failures.push(`${f.name}：${e.message || e}`);
-          }
-        }
-        ctx.setProgress((i + 0.9) / files.length);
-        await App.nextFrame();
-      }
-
-      if (!results.length) {
-        throw new Error(failures.length ? failures.join('；') : '没有可转换的文件');
-      }
-      ctx.setStatus(
-        failures.length
-          ? `成功 ${results.length} 个，失败 ${failures.length} 个 —— ${failures.join('；')}`
-          : `全部转换成功（共 ${results.length} 个）`,
-        true
-      );
-      return results;
+  /* ---------- KGG 格式转换（酷狗专区） ---------- */
+  App.registerTool({
+    id: 'kgg-convert',
+    icon: '🐶',
+    name: 'KGG 格式转换',
+    desc: '酷狗 KGG / KGMA / KGM / VPR 加密歌曲转 MP3 / FLAC / OGG',
+    keywords: 'kgg kgm kgma vpr 酷狗 kugou 歌曲格式转换 转换 音乐',
+    category: 'kgg',
+    accept: '.kgg,.kgma,.kgm,.vpr',
+    acceptText: 'kgg / kgma / kgm / vpr',
+    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（v5 需按提示提供 eKey）',
+    multiple: true,
+    minFiles: 1,
+    async run(files, opts, ctx) {
+      return runDecrypt(files, ctx, KGG_EXTS);
     },
   });
 })();

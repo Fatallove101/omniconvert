@@ -39,7 +39,8 @@
 | 图片 | 尺寸调整 | 按百分比或指定宽高 |
 | 图片 | HEIC 转 JPG | iPhone 照片转通用格式 |
 | 图片 | ICO 图标生成 | 多尺寸 Windows / 网站图标（16~256） |
-| 歌曲 | 歌曲格式转换 | NCM(网易云)、QMC/MFLAC/MGG(QQ音乐)、KGM/KGMA/VPR(酷狗)、KWM(酷我) 转为 MP3/FLAC/OGG（引擎：unlock-music WASM；进入时展示使用须知） |
+| 歌曲 | 歌曲格式转换 | NCM(网易云)、QMC/MFLAC/MGG(QQ音乐)、KWM(酷我) 转为 MP3/FLAC/OGG（引擎：unlock-music WASM） |
+| KGG | KGG 格式转换 | 酷狗 KGG/KGMA/KGM/VPR 转为 MP3/FLAC/OGG（v3 离线直解；v5 需按提示提供 eKey 或密钥库） |
 | 文档 | Word 转 PDF | docx 排版后调起打印「另存为 PDF」（适合普通文档） |
 | 文档 | Excel ↔ CSV | xlsx/xls ↔ csv，自动识别方向 |
 | 文档 | Word 转 HTML | docx → HTML 网页或纯文本 |
