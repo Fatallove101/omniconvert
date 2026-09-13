@@ -312,14 +312,6 @@
 
     App.$$('#chips .chip').forEach((chip) =>
       chip.addEventListener('click', () => {
-        if (chip.dataset.cat === 'music') {
-          /* 歌曲转换：先弹使用须知（免责声明） */
-          App.showMusicDisclaimer(() => {
-            App.filter.cat = 'music';
-            App.renderHome();
-          });
-          return;
-        }
         App.filter.cat = chip.dataset.cat;
         App.renderHome();
       })
