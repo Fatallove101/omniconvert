@@ -822,8 +822,17 @@
       });
     }
 
-    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+    /* Service Worker：仅在浏览器环境注册。
+     * 桌面端（Tauri 的 tauri.localhost）绝对不能开 —— SW 的网络 fetch 会被
+     * 系统 DNS 污染/劫持，导致页面导航失败白屏；桌面资源本身已内嵌，无需 SW。 */
+    if ('serviceWorker' in navigator) {
+      const isTauri = location.hostname === 'tauri.localhost' || !!(window.__TAURI_INTERNALS__);
+      if (isTauri) {
+        navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+        if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)));
+      } else if (/^https?:$/.test(location.protocol)) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
     }
   });
 })();
