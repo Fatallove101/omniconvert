@@ -38,13 +38,18 @@ while ($true) {
     $client.ReceiveTimeout = 5000
     $stream = $client.GetStream()
 
-    # 读取请求头
+    # 读取请求头（浏览器会并行开多个连接并可能提前断开，静默忽略）
     $buf = New-Object byte[] 8192
     $sb = New-Object System.Text.StringBuilder
-    while (-not $sb.ToString().Contains("`r`n`r`n")) {
-      $n = $stream.Read($buf, 0, $buf.Length)
-      if ($n -le 0) { break }
-      [void]$sb.Append([System.Text.Encoding]::ASCII.GetString($buf, 0, $n))
+    try {
+      while (-not $sb.ToString().Contains("`r`n`r`n")) {
+        $n = $stream.Read($buf, 0, $buf.Length)
+        if ($n -le 0) { break }
+        [void]$sb.Append([System.Text.Encoding]::ASCII.GetString($buf, 0, $n))
+      }
+    } catch {
+      $client.Close()
+      continue
     }
     $reqLine = ($sb.ToString() -split "`r`n")[0]
     if (-not $reqLine) { $client.Close(); continue }
