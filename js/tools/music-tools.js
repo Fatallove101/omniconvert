@@ -96,7 +96,7 @@
     if (h.version >= 5) {
       /* v5：需要该歌曲的 eKey。抛出特殊错误，由 run() 弹出输入窗口走手动密钥流程 */
       const err = new Error('该文件为 KGG v5 加密，需要该歌曲的 eKey 密钥');
-      err.needEkey = { hash: h.audioHash, audioOffset: h.audioOffset, buf, name: f.name };
+      err.needEkey = { hash: h.audioHash, audioOffset: h.audioOffset, buf, name };
       throw err;
     }
     if (h.version >= 3) {
