@@ -13,6 +13,7 @@
       { id: 'pdf', label: 'PDF', icon: '📕' },
       { id: 'image', label: '图片', icon: '🖼️' },
       { id: 'doc', label: '文档', icon: '📄' },
+      { id: 'music', label: '歌曲转换', icon: '🎵' },
     ],
     filter: { cat: 'all', q: '' },
   };
@@ -177,6 +178,19 @@
       });
     }
     return App._qpdfPromise;
+  };
+
+  /** unlock-music WASM 懒加载（歌曲解密引擎），单例 */
+  App.um = function () {
+    if (!App._umPromise) {
+      App._umPromise = (async () => {
+        const um = await import('vendor/um/loader.mjs');
+        await um.ready;
+        if (um.initPanicHook) um.initPanicHook();
+        return um;
+      })();
+    }
+    return App._umPromise;
   };
 
   /* ---------- 工具注册 ---------- */

@@ -16,7 +16,7 @@
 - 手机访问：让手机与电脑连同一 Wi-Fi，把 `server.ps1` 中监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口后访问 `http://<电脑IP>:8137`
 - 正式部署：整个目录是纯静态文件，可直接托管到 GitHub Pages / Nginx / 对象存储 + CDN
 
-## 功能列表（22 个工具）
+## 功能列表（23 个工具）
 
 | 分类 | 工具 | 说明 |
 | --- | --- | --- |
@@ -39,10 +39,13 @@
 | 图片 | 尺寸调整 | 按百分比或指定宽高 |
 | 图片 | HEIC 转 JPG | iPhone 照片转通用格式 |
 | 图片 | ICO 图标生成 | 多尺寸 Windows / 网站图标（16~256） |
+| 歌曲 | 歌曲解密 | NCM(网易云)、QMC/MFLAC/MGG(QQ音乐)、KGM/KGMA/VPR(酷狗)、KWM(酷我) → MP3/FLAC/OGG（引擎：unlock-music WASM） |
 | 文档 | Word 转 PDF | docx 排版后调起打印「另存为 PDF」（适合普通文档） |
 | 文档 | Excel ↔ CSV | xlsx/xls ↔ csv，自动识别方向 |
 | 文档 | Word 转 HTML | docx → HTML 网页或纯文本 |
 | 文档 | Markdown 转 HTML | 输出带样式的完整网页 |
+
+> **歌曲转换的边界**：本工具做的是"解密还原"——去掉加密壳得到**原本就封装在内**的 MP3/FLAC/OGG（音质无损），**不做有损转码**（如 FLAC→MP3 需要音频编码器 ffmpeg，规划在路线图）。新版 QQ 音乐 MFLAC/MGG 文件必须内嵌 eKey（大部分 2020 年后的文件都有）；酷我 KWM v2 需要单独提取的密钥，暂不支持。仅限解密你拥有合法权利的个人歌曲文件。
 
 > **关于"高保真可编辑转换"的边界**：PDF→Word/PPT 目前是图片型（版式 100% 还原但文字不可编辑）或文本型（可编辑但不还原排版）；PDF→Excel（表格结构还原）、Word→PDF 的高保真版式，需要 LibreOffice 等重引擎，规划在服务端模式（见路线图）。
 
