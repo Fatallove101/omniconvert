@@ -96,9 +96,22 @@ omniconvert/
 - **接入步骤**：见 `miniprogram/README.md`（导入开发者工具 → 构建 npm → 部署云函数 → 真机预览）
 - 注意：小程序选择 PDF 走「聊天记录选文件」；自建服务器方案域名必须 HTTPS + ICP 备案
 
-### 2. PC 桌面端（推荐 Tauri）
+### 2. PC 桌面端 ✅（Tauri 已就绪）
 
-把本仓库作为前端资源打包成原生安装包（几 MB），功能零改动；需要系统级能力（右键菜单、文件关联）时用 Rust 侧扩展。Electron 亦可但体积大。
+前端代码原样打包进 Tauri 壳（WebView2），产物两种：
+
+- **绿色版**：`src-tauri/target/release/omniconvert.exe`（约 9MB，双击即用）
+- **安装包**：`src-tauri/target/release/bundle/nsis/万象转换_x.y.z_x64-setup.exe`（约 3.6MB，NSIS 向导）
+
+打包步骤（需 Rust MSVC + Node + VS Build Tools）：
+
+```
+npm install
+powershell -ExecutionPolicy Bypass -File make-dist.ps1   # 只复制纯静态资源到 dist/
+npm run tauri build
+```
+
+换图标：替换 `assets/icons/icon-512.png` 后运行 `npm run tauri icon`。
 
 ### 3. 服务端模式（可选）
 
