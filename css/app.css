@@ -138,6 +138,54 @@
 
 .result-dl.ghost { background: #eef2ff; color: var(--primary); }
 
+/* ---------- 免责声明弹窗 ---------- */
+.disclaimer-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 34, 0.55);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.disclaimer-card {
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  max-width: 430px;
+  width: 100%;
+  padding: 26px 24px 22px;
+  text-align: center;
+  animation: disclaimer-pop 0.18s ease-out;
+}
+@keyframes disclaimer-pop {
+  from { transform: scale(0.94); opacity: 0.5; }
+  to { transform: none; opacity: 1; }
+}
+.disclaimer-icon { font-size: 34px; }
+.disclaimer-card h3 { margin: 8px 0 10px; font-size: 18px; }
+.disclaimer-card p { color: var(--muted); font-size: 13.5px; line-height: 1.7; margin: 6px 0; text-align: left; }
+.disclaimer-card b { color: var(--primary); }
+.disclaimer-btns { display: flex; gap: 10px; margin-top: 16px; }
+.disclaimer-btns button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #f3f4f6;
+  color: var(--text);
+}
+.disclaimer-btns .disclaimer-ok {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+}
+.disclaimer-btns .disclaimer-ok:hover { filter: brightness(1.06); }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -524,6 +572,7 @@ html.dark .page-card { background: rgba(255, 255, 255, 0.04); border-color: var(
 html.dark .page-thumb { background: #0b0e1a; }
 html.dark .page-btns button { background: var(--card); border-color: var(--line); color: var(--text); }
 html.dark .result-dl.ghost { background: rgba(99, 102, 241, 0.15); color: var(--primary); }
+html.dark .disclaimer-btns button { background: rgba(255, 255, 255, 0.05); border-color: var(--line); color: var(--text); }
 html.dark .recent-chip { background: var(--card); border-color: var(--line); }
 html.dark .theme-btn { background: var(--card); border-color: var(--line); }
 html.dark .preview-drawer { box-shadow: -8px 0 32px rgba(0, 0, 0, 0.55); }

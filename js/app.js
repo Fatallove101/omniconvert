@@ -266,7 +266,7 @@
       <section class="hero">
         <div class="hero-badge">🔒 100% 本地处理 · 文件永不上传</div>
         <h1>万象转换</h1>
-        <p class="hero-sub">PDF · 图片 · Office 文档格式转换，全部在你的浏览器里完成，离线可用。</p>
+        <p class="hero-sub">PDF · 图片 · 歌曲 · Office 文档格式转换，全部在你的浏览器里完成，离线可用。</p>
       </section>
       <section class="toolbar">
         <input id="search" type="search" placeholder="搜索工具，如：合并、压缩、转 PDF…" value="${f.q.replace(/"/g, '&quot;')}" />
@@ -312,6 +312,14 @@
 
     App.$$('#chips .chip').forEach((chip) =>
       chip.addEventListener('click', () => {
+        if (chip.dataset.cat === 'music') {
+          /* 歌曲转换：先弹使用须知（免责声明） */
+          App.showMusicDisclaimer(() => {
+            App.filter.cat = 'music';
+            App.renderHome();
+          });
+          return;
+        }
         App.filter.cat = chip.dataset.cat;
         App.renderHome();
       })
@@ -334,6 +342,12 @@
     const tool = App.getTool(id);
     App.state = { toolId: id, files: [], results: [], busy: false };
     document.title = `${tool.name} — 万象转换`;
+    /* 歌曲转换类工具：进入前先弹使用须知 */
+    if (tool.category === 'music') {
+      App.showMusicDisclaimer(null, () => {
+        location.hash = '#/';
+      });
+    }
     const savedOpts = App.loadSavedOptions(id);
 
     const optionsHtml = (tool.options || [])
@@ -718,6 +732,35 @@
     if (body) body.innerHTML = '';
   };
 
+  /** 歌曲转换免责声明弹窗（每次进入该栏目/工具时展示） */
+  App.showMusicDisclaimer = function (onOk, onCancel) {
+    const old = App.$('#disclaimer-mask');
+    if (old) old.remove();
+    const mask = document.createElement('div');
+    mask.id = 'disclaimer-mask';
+    mask.className = 'disclaimer-mask';
+    mask.innerHTML = `
+      <div class="disclaimer-card">
+        <div class="disclaimer-icon">🎵</div>
+        <h3>使用须知</h3>
+        <p>歌曲格式转换功能仅用于<b>个人学习与研究</b>，请支持正版音乐。</p>
+        <p>请确保仅对您拥有合法权利的音频文件进行操作；使用本功能产生的一切后果由使用者自行承担。</p>
+        <div class="disclaimer-btns">
+          <button type="button" class="disclaimer-cancel">取消</button>
+          <button type="button" class="disclaimer-ok">我已阅读并继续</button>
+        </div>
+      </div>`;
+    document.body.appendChild(mask);
+    mask.querySelector('.disclaimer-ok').addEventListener('click', () => {
+      mask.remove();
+      if (onOk) onOk();
+    });
+    mask.querySelector('.disclaimer-cancel').addEventListener('click', () => {
+      mask.remove();
+      if (onCancel) onCancel();
+    });
+  };
+
   App.runTool = async function (id) {
     const tool = App.getTool(id);
     if (App.state.busy || !App.state.files.length) return;
@@ -845,6 +888,15 @@
         navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
         if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)));
       } else if (/^https?:$/.test(location.protocol)) {
+        /* 有新版本发布时自动刷新一次页面（旧 SW 会被 skipWaiting 接管） */
+        let hadController = !!navigator.serviceWorker.controller;
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (hadController && !refreshing) {
+            refreshing = true;
+            location.reload();
+          }
+        });
         navigator.serviceWorker.register('sw.js').catch(() => {});
       }
     }

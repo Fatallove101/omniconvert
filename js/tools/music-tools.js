@@ -140,9 +140,9 @@
   App.registerTool({
     id: 'music-decrypt',
     icon: '🎵',
-    name: '歌曲解密',
-    desc: 'NCM(网易云) / QMC·MFLAC·MGG(QQ音乐) / KGM·KGMA·VPR(酷狗) / KWM(酷我) 还原为 MP3/FLAC/OGG',
-    keywords: 'ncm qmc kgm kgma vpr kwm mflac mgg 网易云音乐 qq音乐 酷狗 酷我 解密 歌曲 音乐',
+    name: '歌曲格式转换',
+    desc: '网易云 / QQ音乐 / 酷狗 / 酷我 加密歌曲转 MP3 / FLAC / OGG',
+    keywords: 'ncm qmc kgm kgma vpr kwm mflac mgg 网易云音乐 qq音乐 酷狗 酷我 歌曲格式转换 转换 音乐',
     category: 'music',
     accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kgm,.kgma,.vpr,.kwm',
     acceptText: 'ncm / qmc* / mflac / mgg / kgm / kgma / vpr / kwm',
@@ -153,7 +153,7 @@
       try {
         um = await App.um();
       } catch (e) {
-        throw new Error('解密引擎加载失败：' + (e.message || e));
+        throw new Error('转换引擎加载失败：' + (e.message || e));
       }
 
       const results = [];
@@ -162,14 +162,14 @@
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const extIn = extOf(f.name);
-        ctx.setStatus(`解密 ${f.name}（${i + 1}/${files.length}）…`);
+        ctx.setStatus(`转换 ${f.name}（${i + 1}/${files.length}）…`);
         ctx.setProgress((i + 0.25) / files.length);
         try {
           const fn = ROUTE[extIn];
           if (!fn) throw new Error('暂不支持该扩展名');
           const buf = new Uint8Array(await App.readAsArrayBuffer(f));
           const out = fn(um, buf, f.name);
-          if (!out || !out.length) throw new Error('解密结果为空');
+          if (!out || !out.length) throw new Error('转换结果为空');
           const ext = detectExt(um, out) || FALLBACK_EXT[extIn] || 'mp3';
           results.push({
             name: `${baseOf(f.name)}.${ext}`,
@@ -183,12 +183,12 @@
       }
 
       if (!results.length) {
-        throw new Error(failures.length ? failures.join('；') : '没有可解密的文件');
+        throw new Error(failures.length ? failures.join('；') : '没有可转换的文件');
       }
       ctx.setStatus(
         failures.length
           ? `成功 ${results.length} 个，失败 ${failures.length} 个 —— ${failures.join('；')}`
-          : `全部解密成功（共 ${results.length} 个）`,
+          : `全部转换成功（共 ${results.length} 个）`,
         true
       );
       return results;
