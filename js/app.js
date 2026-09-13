@@ -68,6 +68,22 @@
     );
   };
 
+  /** 加载任意图片文件为可绘制位图（HEIC 自动经 heic2any 解码） */
+  App.loadImageFile = async function (file) {
+    let src = file;
+    if (/\.(heic|heif)$/i.test(file.name) || /hei[cf]/i.test(file.type || '')) {
+      if (window.heic2any) {
+        const out = await heic2any(file, { toType: 'image/png' });
+        src = Array.isArray(out) ? out[0] : out;
+      }
+    }
+    try {
+      return await App.loadImage(src);
+    } catch (e) {
+      throw new Error(`无法解码图片：${file.name}`);
+    }
+  };
+
   /** 加载图片文件为 HTMLImageElement（含 HEIC 预转换交给调用方处理） */
   App.loadImage = async function (blob) {
     let src = blob;
@@ -164,6 +180,33 @@
     return App.tools.find((t) => t.id === id) || null;
   };
 
+  /* ---------- 最近使用 / 选项记忆（localStorage） ---------- */
+
+  App.getRecent = function () {
+    try {
+      const arr = JSON.parse(localStorage.getItem('oc-recent') || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  App.recordRecent = function (id) {
+    const list = App.getRecent().filter((x) => x !== id);
+    list.unshift(id);
+    try {
+      localStorage.setItem('oc-recent', JSON.stringify(list.slice(0, 8)));
+    } catch (e) { /* 忽略 */ }
+  };
+
+  App.loadSavedOptions = function (id) {
+    try {
+      return JSON.parse(localStorage.getItem('oc-opts-' + id) || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  };
+
   /* ---------- 路由 ---------- */
 
   App.route = function () {
@@ -190,6 +233,11 @@
       return okCat && okQ;
     });
 
+    const recentTools = App.getRecent()
+      .map((id) => App.getTool(id))
+      .filter(Boolean)
+      .slice(0, 6);
+
     App.$('#view').innerHTML = `
       <section class="hero">
         <div class="hero-badge">🔒 100% 本地处理 · 文件永不上传</div>
@@ -207,6 +255,13 @@
           )
           .join('')}
       </nav>
+      ${
+        recentTools.length
+          ? `<div class="recent"><span class="recent-label">最近使用</span>${recentTools
+              .map((t) => `<a class="recent-chip" href="#/tool/${t.id}">${t.icon} ${t.name}</a>`)
+              .join('')}</div>`
+          : ''
+      }
       <section class="grid" id="tool-grid">
         ${tools.length
           ? tools.map(App.toolCard).join('')
@@ -255,10 +310,11 @@
     const tool = App.getTool(id);
     App.state = { toolId: id, files: [], results: [], busy: false };
     document.title = `${tool.name} — 万象转换`;
+    const savedOpts = App.loadSavedOptions(id);
 
     const optionsHtml = (tool.options || [])
       .map((o) => {
-        const val = o.default;
+        const val = savedOpts[o.key] !== undefined ? savedOpts[o.key] : o.default;
         if (o.type === 'select') {
           return `
             <label class="opt">
@@ -325,6 +381,14 @@
             <ul id="result-list" class="result-list"></ul>
             <button id="again-btn" class="again-btn">↻ 再转换一批</button>
           </div>
+          <div id="preview-mask" class="preview-mask" hidden></div>
+          <div id="preview-drawer" class="preview-drawer" hidden aria-label="结果预览">
+            <div class="preview-head">
+              <span id="preview-title" class="preview-title"></span>
+              <button id="preview-close" class="preview-close" aria-label="关闭预览">✕</button>
+            </div>
+            <div id="preview-body" class="preview-body"></div>
+          </div>
         </div>
         <footer class="foot"><p>万象转换 OmniConvert · 文件不会离开你的设备</p></footer>
       </div>
@@ -362,6 +426,8 @@
       const entries = App.state.results;
       await App.downloadZip(entries, `${tool.id}-${App.nowStamp()}.zip`);
     });
+    App.$('#preview-close').addEventListener('click', App.closePreview);
+    App.$('#preview-mask').addEventListener('click', App.closePreview);
   };
 
   App.addFiles = function (id, files) {
@@ -422,11 +488,15 @@
   App.renderOrganizer = async function () {
     const box = App.$('#organizer');
     if (!box) return;
+    const tool = App.getTool(App.state.toolId);
     const file = App.state.files[0];
     if (!file) {
       App.state.pages = null;
       box.innerHTML = '';
       return;
+    }
+    if (tool && tool.organize === 'image') {
+      return App.renderImageOrganizer(box);
     }
     box.innerHTML = '<div class="org-status">生成页面缩略图…</div><div class="pages-grid" id="pages-grid"></div>';
     try {
@@ -458,7 +528,30 @@
     }
   };
 
-  App.renderPageCards = function () {
+  /** 图片排序（图片转 PDF 用）：缩略图直接来自图片文件本身 */
+  App.renderImageOrganizer = async function (box) {
+    box.innerHTML = '<div class="org-status">生成缩略图…</div><div class="pages-grid" id="pages-grid"></div>';
+    const thumbs = [];
+    for (let i = 0; i < App.state.files.length; i++) {
+      const f = App.state.files[i];
+      try {
+        const img = await App.loadImageFile(f);
+        const k = 120 / Math.max(img.width, img.height);
+        const c = App.drawToCanvas(img, img.width * k, img.height * k);
+        thumbs.push(c.toDataURL('image/jpeg', 0.75));
+      } catch (e) {
+        thumbs.push('');
+      }
+      App.state.pages = App.state.files.map((_, j) => ({ src: j, rot: 0 }));
+      const st = App.$('.org-status');
+      if (st) st.textContent = `生成缩略图 ${i + 1}/${App.state.files.length}…`;
+      await App.nextFrame();
+    }
+    App.state._thumbUrls = thumbs;
+    App.renderPageCards('拖拽缩略图调整图片顺序（手机用 ◀ ▶），🔄 旋转图片，🗑️ 移除图片，然后点“开始转换”');
+  };
+
+  App.renderPageCards = function (hint) {
     const grid = App.$('#pages-grid');
     if (!grid || !App.state.pages) return;
     grid.innerHTML = App.state.pages
@@ -508,7 +601,9 @@
     });
     const st = App.$('.org-status');
     if (st)
-      st.textContent = `共 ${App.state.pages.length} 页 · 拖拽缩略图调整顺序（手机用 ◀ ▶），🗑️ 删除页面，🔄 旋转页面，然后点“开始转换”`;
+      st.textContent =
+        hint ||
+        `共 ${App.state.pages.length} 页 · 拖拽缩略图调整顺序（手机用 ◀ ▶），🗑️ 删除页面，🔄 旋转页面，然后点“开始转换”`;
   };
 
   App.movePage = function (from, to) {
@@ -531,6 +626,72 @@
     if (!pages || pages.length <= 1) return;
     pages.splice(i, 1);
     App.renderPageCards();
+  };
+
+  /* ---------- 结果预览抽屉 ---------- */
+
+  App.openPreview = async function (r) {
+    const mask = App.$('#preview-mask');
+    const drawer = App.$('#preview-drawer');
+    const body = App.$('#preview-body');
+    const title = App.$('#preview-title');
+    if (!drawer) return;
+    title.textContent = r.name;
+    body.innerHTML = '<div class="preview-loading">加载预览…</div>';
+    mask.hidden = false;
+    drawer.hidden = false;
+
+    if (App._previewUrl) {
+      URL.revokeObjectURL(App._previewUrl);
+      App._previewUrl = null;
+    }
+
+    const t = r.blob.type || '';
+    try {
+      if (t.startsWith('image/')) {
+        App._previewUrl = URL.createObjectURL(r.blob);
+        body.innerHTML = `<img class="preview-img" src="${App._previewUrl}" alt="预览" />`;
+      } else if (t === 'application/pdf') {
+        const buf = await r.blob.arrayBuffer();
+        const pdf = await App.pdfjs().getDocument({ data: new Uint8Array(buf) }).promise;
+        const page = await pdf.getPage(1);
+        const vp1 = page.getViewport({ scale: 1 });
+        const scale = Math.min(2, 720 / vp1.width);
+        const vp = page.getViewport({ scale });
+        const c = document.createElement('canvas');
+        c.width = Math.ceil(vp.width);
+        c.height = Math.ceil(vp.height);
+        const cx = c.getContext('2d', { alpha: false });
+        cx.fillStyle = '#fff';
+        cx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: cx, viewport: vp }).promise;
+        body.innerHTML =
+          `<img class="preview-img" src="${c.toDataURL('image/jpeg', 0.85)}" alt="第1页预览" />` +
+          (pdf.numPages > 1 ? `<div class="muted preview-note">共 ${pdf.numPages} 页，此处预览第 1 页</div>` : '');
+      } else if (t.startsWith('text/') || t === 'application/json') {
+        const text = await r.blob.text();
+        const shown = text.length > 20000 ? text.slice(0, 20000) + '\n…（仅显示前 2 万字符）' : text;
+        body.innerHTML = '<pre class="preview-text"></pre>';
+        body.querySelector('pre').textContent = shown;
+      } else {
+        body.innerHTML = '<div class="muted preview-note">该文件类型不支持预览，请下载后查看。</div>';
+      }
+    } catch (e) {
+      body.innerHTML = '<div class="muted preview-note">预览失败：' + (e.message || e) + '</div>';
+    }
+  };
+
+  App.closePreview = function () {
+    const drawer = App.$('#preview-drawer');
+    const mask = App.$('#preview-mask');
+    if (drawer) drawer.hidden = true;
+    if (mask) mask.hidden = true;
+    if (App._previewUrl) {
+      URL.revokeObjectURL(App._previewUrl);
+      App._previewUrl = null;
+    }
+    const body = App.$('#preview-body');
+    if (body) body.innerHTML = '';
   };
 
   App.runTool = async function (id) {
@@ -569,27 +730,48 @@
         },
       });
       App.state.results = results;
+      try {
+        localStorage.setItem('oc-opts-' + id, JSON.stringify(options));
+      } catch (e) { /* 忽略 */ }
+      App.recordRecent(id);
       App.setProgress(1);
       const secs = ((performance.now() - t0) / 1000).toFixed(1);
       App.setStatus(App._keepStatus ? `${App.$('#status').textContent} · 用时 ${secs} 秒` : `用时 ${secs} 秒`);
       const list = App.$('#result-list');
       list.innerHTML = results
-        .map(
-          (r, i) => `
+        .map((r, i) => {
+          const t = r.blob.type || '';
+          const copyable = t.startsWith('text/') || t === 'application/json';
+          return `
           <li class="result-item">
             <span class="result-icon">📄</span>
             <span class="result-name" title="${r.name}">${r.name}</span>
             <span class="result-size">${App.formatSize(r.blob.size)}</span>
-            <button class="result-dl" data-i="${i}">下载</button>
-          </li>`
-        )
-        .join('');
-      App.$$('.result-dl', list).forEach((btn) =>
-        btn.addEventListener('click', () => {
-          const r = App.state.results[+btn.dataset.i];
-          App.download(r.name, r.blob);
+            <button class="result-dl ghost" data-act="preview" data-i="${i}">预览</button>
+            ${copyable ? '<button class="result-dl ghost" data-act="copy" data-i="' + i + '">复制</button>' : ''}
+            <button class="result-dl" data-act="download" data-i="${i}">下载</button>
+          </li>`;
         })
-      );
+        .join('');
+      list.onclick = async (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        const r = App.state.results[+btn.dataset.i];
+        if (!r) return;
+        if (btn.dataset.act === 'download') {
+          App.download(r.name, r.blob);
+        } else if (btn.dataset.act === 'preview') {
+          App.openPreview(r);
+        } else if (btn.dataset.act === 'copy') {
+          try {
+            await navigator.clipboard.writeText(await r.blob.text());
+            btn.textContent = '已复制';
+            setTimeout(() => (btn.textContent = '复制'), 1500);
+          } catch (err) {
+            App.showError('复制失败：' + (err.message || err));
+          }
+        }
+      };
       App.$('#zip-btn').hidden = results.length < 2;
       App.$('#results').hidden = false;
     } catch (err) {
@@ -608,6 +790,23 @@
   document.addEventListener('DOMContentLoaded', () => {
     App.route();
     window.addEventListener('hashchange', () => App.route());
+
+    /* 深浅色切换（记忆选择，默认跟随系统） */
+    const tg = document.getElementById('theme-toggle');
+    if (tg) {
+      const applyIcon = () => {
+        tg.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+      };
+      applyIcon();
+      tg.addEventListener('click', () => {
+        const dark = document.documentElement.classList.toggle('dark');
+        try {
+          localStorage.setItem('oc-theme', dark ? 'dark' : 'light');
+        } catch (e) { /* 忽略 */ }
+        applyIcon();
+      });
+    }
+
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }

@@ -6,12 +6,23 @@
   <meta name="description" content="万象转换 OmniConvert — 浏览器本地文件格式转换：PDF 合并/拆分/压缩/转图片、图片格式互转、Excel↔CSV、Word 转 HTML。文件永不上传。" />
   <meta name="theme-color" content="#4f46e5" />
   <title>万象转换 OmniConvert — 本地文件格式转换</title>
+  <script>
+    /* 尽早应用主题，避免闪烁：记忆 > 系统 */
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('oc-theme'); } catch (e) {}
+      if (t === 'dark' || (!t && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
+  <button id="theme-toggle" class="theme-btn" title="切换深浅色" aria-label="切换深浅色">🌙</button>
   <div id="view" class="view">加载中…</div>
 
   <script src="vendor/jszip.min.js"></script>

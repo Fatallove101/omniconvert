@@ -1,23 +1,13 @@
 /* ============================================================
- * 图片工具组 — 格式转换 / 压缩 / 尺寸调整 / HEIC 转 JPG
+ * 图片工具组 — 格式转换 / 压缩 / 尺寸调整 / HEIC 转 JPG / ICO 图标
  * ============================================================ */
 (function () {
   'use strict';
   const App = window.App;
 
-  /** HEIC/HEIF 先经 heic2any 解码，其余直接解码为位图 */
+  /** 解码为位图（HEIC/HEIF 自动处理，逻辑统一在 App.loadImageFile） */
   async function toBitmap(file) {
-    let src = file;
-    if (/\.(heic|heif)$/i.test(file.name) || /hei[cf]/i.test(file.type || '')) {
-      App.setStatus(`解码 HEIC：${file.name} …`);
-      src = await heic2any(file, { toType: 'image/png' });
-      if (Array.isArray(src)) src = src[0];
-    }
-    try {
-      return await App.loadImage(src);
-    } catch (e) {
-      throw new Error(`无法解码图片：${file.name}`);
-    }
+    return App.loadImageFile(file);
   }
 
   /** 检测是否含透明像素（缩到 64x64 快速扫描） */
@@ -277,6 +267,87 @@
         await App.nextFrame();
       }
       return results;
+    },
+  });
+
+  /* ---------- 5. ICO 图标生成 ---------- */
+  App.registerTool({
+    id: 'image-to-ico',
+    icon: '🎯',
+    name: 'ICO 图标生成',
+    desc: '把图片转成多尺寸 Windows / 网站图标（.ico）',
+    keywords: 'ico 图标 favicon 网站图标 生成 windows',
+    category: 'image',
+    accept: '.png,.jpg,.jpeg,.webp',
+    acceptText: 'PNG / JPG / WebP 图片（建议方形）',
+    multiple: false,
+    options: [
+      {
+        key: 'preset', label: '尺寸方案', type: 'select', default: 'standard',
+        choices: [
+          { v: 'standard', label: '标准：16/32/48/64/128/256' },
+          { v: 'compact', label: '精简：16/32/48' },
+          { v: 'hd', label: '高清：64/128/256' },
+        ],
+      },
+    ],
+    async run(files, opts, ctx) {
+      const presets = {
+        standard: [16, 32, 48, 64, 128, 256],
+        compact: [16, 32, 48],
+        hd: [64, 128, 256],
+      };
+      const sizes = presets[opts.preset] || presets.standard;
+      const f = files[0];
+
+      ctx.setStatus('解码图片…');
+      const img = await toBitmap(f);
+
+      /* 逐尺寸渲染为 PNG（非方形图 contain 居中，透明补边） */
+      const pngs = [];
+      for (const s of sizes) {
+        ctx.setStatus(`生成 ${s}×${s}…`);
+        const c = document.createElement('canvas');
+        c.width = s;
+        c.height = s;
+        const cx = c.getContext('2d');
+        const k = Math.min(s / img.width, s / img.height);
+        const w = Math.max(1, Math.round(img.width * k));
+        const h = Math.max(1, Math.round(img.height * k));
+        cx.drawImage(img, Math.floor((s - w) / 2), Math.floor((s - h) / 2), w, h);
+        const blob = await App.canvasToBlob(c, 'image/png');
+        pngs.push(new Uint8Array(await blob.arrayBuffer()));
+        await App.nextFrame();
+      }
+
+      /* 打包 ICO 容器（ICONDIR + ICONDIRENTRY×N + PNG 数据，小端） */
+      ctx.setStatus('打包 ICO…');
+      const count = pngs.length;
+      const headerSize = 6 + 16 * count;
+      const total = headerSize + pngs.reduce((a, b) => a + b.length, 0);
+      const buf = new Uint8Array(total);
+      const dv = new DataView(buf.buffer);
+      dv.setUint16(0, 0, true);       // reserved
+      dv.setUint16(2, 1, true);       // type: icon
+      dv.setUint16(4, count, true);   // image count
+      let offset = headerSize;
+      pngs.forEach((png, i) => {
+        const e = 6 + 16 * i;
+        const s = sizes[i];
+        dv.setUint8(e, s >= 256 ? 0 : s);      // width（0 表示 256）
+        dv.setUint8(e + 1, s >= 256 ? 0 : s);  // height
+        dv.setUint8(e + 2, 0);                 // 调色板数
+        dv.setUint8(e + 3, 0);                 // reserved
+        dv.setUint16(e + 4, 1, true);          // planes
+        dv.setUint16(e + 6, 32, true);         // bpp
+        dv.setUint32(e + 8, png.length, true); // 数据长度
+        dv.setUint32(e + 12, offset, true);    // 数据偏移
+        buf.set(png, offset);
+        offset += png.length;
+      });
+
+      ctx.setStatus(`已生成 ${count} 个尺寸`, true);
+      return [{ name: baseOf(f.name) + '.ico', blob: new Blob([buf], { type: 'image/x-icon' }) }];
     },
   });
 })();

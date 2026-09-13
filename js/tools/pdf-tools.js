@@ -106,9 +106,11 @@
         choices: [
           { v: 'each', label: '每页一个文件' },
           { v: 'ranges', label: '按页码范围拆分' },
+          { v: 'everyN', label: '每 N 页一组' },
         ],
       },
       { key: 'ranges', label: '页码范围（用逗号分隔，如 1-3,5）', type: 'text', default: '1-3', placeholder: '1-3,5' },
+      { key: 'everyN', label: '每组页数 N', type: 'number', min: 1, default: 3 },
     ],
     async run(files, opts, ctx) {
       const file = files[0];
@@ -120,6 +122,14 @@
       let groups;
       if (opts.mode === 'ranges') {
         groups = parseRanges(opts.ranges, n);
+      } else if (opts.mode === 'everyN') {
+        const size = Math.max(1, Math.round(opts.everyN || 3));
+        groups = [];
+        for (let i = 0; i < n; i += size) {
+          const g = [];
+          for (let j = i; j < Math.min(i + size, n); j++) g.push(j);
+          groups.push(g);
+        }
       } else {
         groups = Array.from({ length: n }, (_, i) => [i]);
       }
@@ -191,18 +201,37 @@
     },
   });
 
-  /* ---------- 4. 图片转 PDF ---------- */
+  /** 经画布重编码图片（浏览器不能直接嵌入的格式，或需要旋转时）；rot 为 90 的倍数 */
+  async function reencodeJpeg(file, rot) {
+    const img = await App.loadImageFile(file);
+    const swapped = rot === 90 || rot === 270;
+    const w = swapped ? img.height : img.width;
+    const h = swapped ? img.width : img.height;
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w));
+    c.height = Math.max(1, Math.round(h));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    return App.canvasToBlob(c, 'image/jpeg', 0.92);
+  }
+
+  /* ---------- 4. 图片转 PDF（支持拖拽排序/旋转/移除） ---------- */
   App.registerTool({
     id: 'image-to-pdf',
     icon: '📔',
     name: '图片转 PDF',
-    desc: '把多张图片合成一个 PDF 文件',
-    keywords: 'img2pdf 图片 合成 pdf 扫描',
+    desc: '多张图片合成 PDF，可拖拽调整顺序',
+    keywords: 'img2pdf 图片 合成 pdf 扫描 排序',
     category: 'pdf',
     accept: '.jpg,.jpeg,.png,.webp,.bmp,.gif',
     acceptText: 'JPG / PNG / WebP / BMP / GIF 图片',
     multiple: true,
     minFiles: 1,
+    organize: 'image',
     options: [
       {
         key: 'pageSize', label: '页面大小', type: 'select', default: 'fit',
@@ -225,22 +254,32 @@
       const out = await PDFDocument.create();
       const MM = 72 / 25.4;
 
-      for (let i = 0; i < files.length; i++) {
-        const f = files[i];
-        ctx.setStatus(`处理 ${f.name}（${i + 1}/${files.length}）…`);
-        ctx.setProgress((i + 0.2) / files.length);
+      /* 有排序器状态时按用户排好的顺序与旋转输出 */
+      const pages =
+        App.state.pages && App.state.pages.length
+          ? App.state.pages
+          : files.map((f, i) => ({ src: i, rot: 0 }));
 
-        let bytes = new Uint8Array(await App.readAsArrayBuffer(f));
+      for (let i = 0; i < pages.length; i++) {
+        const p = pages[i];
+        const f = files[p.src];
+        ctx.setStatus(`处理 ${f.name}（${i + 1}/${pages.length}）…`);
+        ctx.setProgress((i + 0.2) / pages.length);
+
+        const rot = (((p.rot || 0) % 360) + 360) % 360;
         let embed;
-        if (/\.jpe?g$/i.test(f.name) || f.type === 'image/jpeg') {
-          embed = await out.embedJpg(bytes);
-        } else if (/\.png$/i.test(f.name) || f.type === 'image/png') {
-          embed = await out.embedPng(bytes);
+        if (rot === 0) {
+          const bytes = new Uint8Array(await App.readAsArrayBuffer(f));
+          if (/\.jpe?g$/i.test(f.name) || f.type === 'image/jpeg') {
+            embed = await out.embedJpg(bytes);
+          } else if (/\.png$/i.test(f.name) || f.type === 'image/png') {
+            embed = await out.embedPng(bytes);
+          } else {
+            const b = await reencodeJpeg(f, 0);
+            embed = await out.embedJpg(new Uint8Array(await b.arrayBuffer()));
+          }
         } else {
-          /* webp/bmp/gif 等先经画布转 JPG */
-          const img = await App.loadImage(f);
-          const c = App.drawToCanvas(img, img.width, img.height);
-          const b = await App.canvasToBlob(c, 'image/jpeg', 0.92);
+          const b = await reencodeJpeg(f, rot);
           embed = await out.embedJpg(new Uint8Array(await b.arrayBuffer()));
         }
 
@@ -264,7 +303,7 @@
         const h = embed.height * scale;
         const page = out.addPage([pageW, pageH]);
         page.drawImage(embed, { x: (pageW - w) / 2, y: (pageH - h) / 2, width: w, height: h });
-        ctx.setProgress((i + 0.9) / files.length);
+        ctx.setProgress((i + 0.9) / pages.length);
         await App.nextFrame();
       }
 
