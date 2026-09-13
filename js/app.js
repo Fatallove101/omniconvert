@@ -758,7 +758,8 @@
     });
   };
 
-  /** KGG v5 eKey 输入弹窗：返回 Promise<string|null>（取消返回 null） */
+  /** KGG v5 eKey 弹窗：支持 ①直接选 KGMusicV3.db 自动提取 ②手动粘贴。
+   *  返回 Promise<string|null>（取消返回 null） */
   App.askKggEkey = function (audioHash) {
     return new Promise((resolve) => {
       const old = App.$('#kgg-key-mask');
@@ -770,12 +771,14 @@
         <div class="disclaimer-card">
           <div class="disclaimer-icon">🔑</div>
           <h3>需要该歌曲的 eKey 密钥</h3>
-          <p>该文件为酷狗 KGG v5 加密，每首歌的密钥不同。获取方法：</p>
-          <p>① 在本机安装并登录<b>酷狗音乐 PC 客户端</b>；<br>
-             ② 在客户端内用你的账号下载这首歌（密钥只对你自己下载过的歌有效）；<br>
-             ③ 用密钥提取工具（如 TriAgent）从 KGMusicV3.db 中取出该歌曲的 EncryptionKey，粘贴到下方。</p>
+          <p>该文件为酷狗 KGG v5 加密，每首歌的密钥不同。</p>
+          <p><b>方式一（推荐）：</b>选择密钥库文件自动提取。密钥库在登录过酷狗 PC 客户端并下载过这首歌的电脑上：<br>
+             <span class="kgg-path">%APPDATA%\\KuGou8\\KGMusicV3.db</span></p>
+          <input type="file" id="kgg-db-input" accept=".db" />
+          <div id="kgg-db-status" class="muted"></div>
+          <p><b>方式二：</b>手动粘贴该歌曲的 eKey / EncryptionKey：</p>
+          <input type="text" id="kgg-ekey-input" class="kgg-input" placeholder="粘贴 eKey / EncryptionKey" autocomplete="off" spellcheck="false" />
           ${audioHash ? `<p class="muted">本文件音频标识（audio_hash）：${audioHash}</p>` : ''}
-          <input type="text" id="kgg-ekey-input" class="kgg-input" placeholder="粘贴该歌曲的 eKey / EncryptionKey" autocomplete="off" spellcheck="false" />
           <p class="muted">仅限转换你自己账号下载的歌曲，请支持正版。</p>
           <div class="disclaimer-btns">
             <button type="button" class="disclaimer-cancel">取消</button>
@@ -784,6 +787,8 @@
         </div>`;
       document.body.appendChild(mask);
       const input = mask.querySelector('#kgg-ekey-input');
+      const dbInput = mask.querySelector('#kgg-db-input');
+      const dbStatus = mask.querySelector('#kgg-db-status');
       const close = (v) => {
         mask.remove();
         resolve(v);
@@ -801,6 +806,27 @@
       mask.querySelector('.disclaimer-cancel').addEventListener('click', () => close(null));
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') submit();
+      });
+      dbInput.addEventListener('change', async () => {
+        const f = dbInput.files && dbInput.files[0];
+        if (!f) return;
+        dbStatus.textContent = '解密密钥库…';
+        try {
+          const bytes = new Uint8Array(await f.arrayBuffer());
+          const dec = App.decryptKggDb(bytes);
+          const map = await App.extractKggKeyMapping(dec);
+          const total = Object.keys(map).length;
+          const ek = audioHash && map[audioHash];
+          if (ek) {
+            input.value = ek;
+            dbStatus.textContent = `密钥库共 ${total} 条，已找到当前歌曲的密钥 ✓ 正在转换…`;
+            setTimeout(() => close(ek), 300);
+          } else {
+            dbStatus.textContent = `密钥库共 ${total} 条，但没有当前这首歌的密钥（请确认是在该客户端内下载的这首歌）`;
+          }
+        } catch (e) {
+          dbStatus.textContent = '密钥库读取失败：' + (e.message || e);
+        }
       });
       setTimeout(() => input.focus(), 50);
     });
