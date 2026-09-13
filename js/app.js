@@ -184,7 +184,7 @@
   App.um = function () {
     if (!App._umPromise) {
       App._umPromise = (async () => {
-        const um = await import('vendor/um/loader.mjs');
+        const um = await import('./vendor/um/loader.mjs');
         await um.ready;
         if (um.initPanicHook) um.initPanicHook();
         return um;
