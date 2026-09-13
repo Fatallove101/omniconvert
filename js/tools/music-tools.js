@@ -283,7 +283,7 @@
     name: 'KGG 格式转换',
     desc: '酷狗 KGG / KGMA / KGM / VPR 加密歌曲转 MP3 / FLAC / OGG',
     keywords: 'kgg kgm kgma vpr 酷狗 kugou 歌曲格式转换 转换 音乐',
-    category: 'kgg',
+    category: 'music',
     accept: '.kgg,.kgma,.kgm,.vpr',
     acceptText: 'kgg / kgma / kgm / vpr',
     outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（v5 需按提示提供 eKey）',

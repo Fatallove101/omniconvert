@@ -15,7 +15,6 @@
       { id: 'image', label: '图片', icon: '🖼️' },
       { id: 'doc', label: '文档', icon: '📄' },
       { id: 'music', label: '歌曲转换', icon: '🎵' },
-      { id: 'kgg', label: 'KGG转换', icon: '🐶' },
     ],
     filter: { cat: 'all', q: '' },
   };
