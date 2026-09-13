@@ -86,14 +86,28 @@
     return audio;
   }
 
-  /** KGM / KGMA / VPR（酷狗） */
-  function decKGM(um, buf, name) {
-    const headerN = Math.min(buf.length, 0x400);
-    const kg = um.KuGou.from_header(buf.subarray(0, headerN));
-    const kh = new um.KuGouHeader(buf.subarray(0, headerN));
-    const off = kh.offsetToData;
-    if (!(off > 0 && off < buf.length)) throw new Error('KGM 结构异常');
-    const body = buf.slice(off);
+  /** KGM / KGMA / VPR / KGG（酷狗）：按头部版本分流
+   *  v1/v2 → unlock-music WASM；v3 → 内置 KGG v3 解码器（离线公钥）；
+   *  v5 → 需要酷狗客户端的 KGMusicV3.db 密钥库（暂不支持，明确报错） */
+  async function decKGM(um, buf, name) {
+    if (buf.length < 0x40) throw new Error('文件太小，不是有效的酷狗加密文件');
+    const h = App.KGG.parseHeader(buf.subarray(0, 0x400));
+
+    if (h.version >= 5) {
+      throw new Error('该文件为 KGG v5 加密：需要酷狗客户端的 KGMusicV3.db 密钥库，暂不支持');
+    }
+    if (h.version >= 3) {
+      const pubKey = await App.KGG.loadPubKey();
+      const own = new Uint8Array(App.KGG.OWN_LEN);
+      own.set(h.testData);
+      const body = buf.slice(h.audioOffset);
+      App.KGG.decodeV3(body, own, pubKey, 0);
+      return body;
+    }
+
+    /* v1/v2 老格式（密钥内嵌于头部） */
+    const kg = um.KuGou.from_header(buf.subarray(0, Math.min(buf.length, 0x400)));
+    const body = buf.slice(h.audioOffset);
     /* 实测：decrypt 的 offset 参数须为相对 body 的偏移（传绝对偏移会整段错位） */
     kg.decrypt(body, 0);
     return body;
@@ -140,6 +154,7 @@
     kgm: decKGM,
     kgma: decKGM,
     vpr: decKGM,
+    kgg: decKGM,
     qmc0: decQMC,
     qmc3: decQMC,
     qmcflac: decQMC,
@@ -155,11 +170,11 @@
     id: 'music-decrypt',
     icon: '🎵',
     name: '歌曲格式转换',
-    desc: '网易云 / QQ音乐 / 酷狗 / 酷我 加密歌曲转 MP3 / FLAC / OGG',
-    keywords: 'ncm qmc kgm kgma vpr kwm mflac mgg 网易云音乐 qq音乐 酷狗 酷我 歌曲格式转换 转换 音乐',
+    desc: '网易云 / QQ音乐 / 酷狗(KGM/KGMA/KGG) / 酷我 加密歌曲转 MP3 / FLAC / OGG',
+    keywords: 'ncm qmc kgm kgma vpr kgg kwm mflac mgg 网易云音乐 qq音乐 酷狗 酷我 歌曲格式转换 转换 音乐',
     category: 'music',
-    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kgm,.kgma,.vpr,.kwm',
-    acceptText: 'ncm / qmc* / mflac / mgg / kgm / kgma / vpr / kwm',
+    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kgm,.kgma,.kgg,.vpr,.kwm',
+    acceptText: 'ncm / qmc* / mflac / mgg / kgm / kgma / kgg / vpr / kwm',
     outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（原文件是 FLAC 就输出 FLAC）',
     multiple: true,
     minFiles: 1,
@@ -183,7 +198,7 @@
           const fn = ROUTE[extIn];
           if (!fn) throw new Error('暂不支持该扩展名');
           const buf = new Uint8Array(await App.readAsArrayBuffer(f));
-          const out = fn(um, buf, f.name);
+          const out = await fn(um, buf, f.name);
           if (!out || !out.length) throw new Error('转换结果为空');
           const det = detectExt(um, out);
           let ext = det || FALLBACK_EXT[extIn] || null;
