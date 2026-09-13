@@ -929,7 +929,8 @@
 
   /* ---------- 启动 ---------- */
 
-  window.App = App;
+  /* 合并而非覆盖：保护其它脚本（如 md5/aes）先挂到 App 上的成员 */
+  window.App = Object.assign(window.App || {}, App);
   document.addEventListener('DOMContentLoaded', () => {
     App.route();
     window.addEventListener('hashchange', () => App.route());
