@@ -1,0 +1,12 @@
+{
+  "name": "omniconvert",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "dist": "powershell -ExecutionPolicy Bypass -File make-dist.ps1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

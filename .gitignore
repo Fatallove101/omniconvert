@@ -2,6 +2,12 @@
 test/output/
 *.log
 
+# Tauri / Node 构建产物
+dist/
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+
 # 系统文件
 Thumbs.db
 Desktop.ini
