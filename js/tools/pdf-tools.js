@@ -658,4 +658,201 @@
       return [{ name, blob: pdfBlob(bytes) }];
     },
   });
+
+  /* ---------- 12. PDF 转 PPT（图片型） ---------- */
+  App.registerTool({
+    id: 'pdf-to-ppt',
+    icon: '📽️',
+    name: 'PDF 转 PPT',
+    desc: '每页整页放入幻灯片，版式 100% 还原（文字不可编辑）',
+    keywords: 'pdf ppt pptx powerpoint 幻灯片 转换',
+    category: 'pdf',
+    accept: '.pdf',
+    acceptText: 'PDF 文件',
+    multiple: false,
+    options: [
+      {
+        key: 'dpi', label: '清晰度（DPI）', type: 'select', default: '150',
+        choices: [
+          { v: '96', label: '96 DPI（文件小）' },
+          { v: '150', label: '150 DPI（推荐）' },
+          { v: '200', label: '200 DPI（更清晰）' },
+        ],
+      },
+    ],
+    async run(files, opts, ctx) {
+      if (!window.PptxGenJS) throw new Error('PPT 生成库未加载，请刷新页面重试');
+      const file = files[0];
+      const base = file.name.replace(/\.pdf$/i, '');
+      ctx.setStatus('读取 PDF…');
+      const pdf = await getPdfjsDoc(file);
+
+      /* 幻灯片尺寸 = 第一页尺寸（英寸），不同方向页面等比放入不变形 */
+      const p1 = await pdf.getPage(1);
+      const vp1 = p1.getViewport({ scale: 1 });
+      const slideW = vp1.width / 72;
+      const slideH = vp1.height / 72;
+      const pptx = new PptxGenJS();
+      pptx.defineLayout({ name: 'PDFPAGE', width: slideW, height: slideH });
+      pptx.layout = 'PDFPAGE';
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        ctx.setStatus(`渲染第 ${i}/${pdf.numPages} 页…`);
+        ctx.setProgress((i - 0.5) / pdf.numPages);
+        const canvas = await renderPage(pdf, i, parseInt(opts.dpi, 10) / 72);
+        const page = await pdf.getPage(i);
+        const vp = page.getViewport({ scale: 1 });
+        const wIn = vp.width / 72;
+        const hIn = vp.height / 72;
+        const k = Math.min(slideW / wIn, slideH / hIn);
+        const slide = pptx.addSlide();
+        slide.addImage({
+          data: 'image/jpeg;base64,' + canvas.toDataURL('image/jpeg', 0.9).split(',')[1],
+          x: (slideW - wIn * k) / 2,
+          y: (slideH - hIn * k) / 2,
+          w: wIn * k,
+          h: hIn * k,
+        });
+        await App.nextFrame();
+      }
+
+      ctx.setStatus('打包 PPTX…');
+      const blob = await pptx.write({ outputType: 'blob' });
+      return [{ name: `${base}.pptx`, blob }];
+    },
+  });
+
+  /* ---------- 13. PDF 转 Word（图片型 / 文本型） ---------- */
+  App.registerTool({
+    id: 'pdf-to-word',
+    icon: '📑',
+    name: 'PDF 转 Word',
+    desc: '图片型（版式还原）或文本型（可编辑）docx',
+    keywords: 'pdf word docx 转word 转换',
+    category: 'pdf',
+    accept: '.pdf',
+    acceptText: 'PDF 文件',
+    multiple: false,
+    options: [
+      {
+        key: 'mode', label: '转换模式', type: 'select', default: 'image',
+        choices: [
+          { v: 'image', label: '图片型：版式 100% 还原（文字不可编辑）' },
+          { v: 'text', label: '文本型：文字可编辑（不还原排版）' },
+        ],
+      },
+      {
+        key: 'dpi', label: '图片型清晰度（DPI）', type: 'select', default: '150',
+        choices: [
+          { v: '96', label: '96 DPI（文件小）' },
+          { v: '150', label: '150 DPI（推荐）' },
+          { v: '200', label: '200 DPI（更清晰）' },
+        ],
+      },
+    ],
+    async run(files, opts, ctx) {
+      const file = files[0];
+      const base = file.name.replace(/\.pdf$/i, '');
+      ctx.setStatus('读取 PDF…');
+      const pdf = await getPdfjsDoc(file);
+
+      if (opts.mode === 'text') {
+        const texts = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          ctx.setStatus(`提取第 ${i}/${pdf.numPages} 页文本…`);
+          ctx.setProgress(i / pdf.numPages);
+          const page = await pdf.getPage(i);
+          const tc = await page.getTextContent();
+          let text = '';
+          for (const item of tc.items) {
+            if (typeof item.str !== 'string') continue;
+            text += item.str + (item.hasEOL ? '\n' : '');
+          }
+          texts.push(text.trim());
+          await App.nextFrame();
+        }
+        ctx.setStatus('生成 docx…');
+        const blob = await App.buildTextDocx(texts);
+        return [{ name: `${base}.docx`, blob }];
+      }
+
+      const pages = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        ctx.setStatus(`渲染第 ${i}/${pdf.numPages} 页…`);
+        ctx.setProgress((i - 0.5) / pdf.numPages);
+        const canvas = await renderPage(pdf, i, parseInt(opts.dpi, 10) / 72);
+        const jpg = await App.canvasToBlob(canvas, 'image/jpeg', 0.9);
+        const page = await pdf.getPage(i);
+        const vp = page.getViewport({ scale: 1 });
+        pages.push({
+          b64: await App.blobToBase64(jpg),
+          ext: 'jpeg',
+          wpt: vp.width,
+          hpt: vp.height,
+        });
+        await App.nextFrame();
+      }
+      ctx.setStatus('打包 docx…');
+      const blob = await App.buildImageDocx(pages);
+      return [{ name: `${base}.docx`, blob }];
+    },
+  });
+
+  /* ---------- 14. PDF 图片化（拍平） ---------- */
+  App.registerTool({
+    id: 'pdf-flatten',
+    icon: '🔲',
+    name: 'PDF 图片化',
+    desc: '每页转为整页图片重新打包，防止复制/修改',
+    keywords: 'flatten 拍平 图片化 防复制 只读',
+    category: 'pdf',
+    accept: '.pdf',
+    acceptText: 'PDF 文件',
+    multiple: false,
+    options: [
+      {
+        key: 'format', label: '图片格式', type: 'select', default: 'jpeg',
+        choices: [
+          { v: 'jpeg', label: 'JPG（文件小）' },
+          { v: 'png', label: 'PNG（无损）' },
+        ],
+      },
+      {
+        key: 'dpi', label: '清晰度（DPI）', type: 'select', default: '150',
+        choices: [
+          { v: '96', label: '96 DPI（文件小）' },
+          { v: '150', label: '150 DPI（推荐）' },
+          { v: '300', label: '300 DPI（高清）' },
+        ],
+      },
+    ],
+    async run(files, opts, ctx) {
+      const file = files[0];
+      const base = file.name.replace(/\.pdf$/i, '');
+      ctx.setStatus('读取 PDF…');
+      const pdf = await getPdfjsDoc(file);
+      const out = await PDFDocument.create();
+      const isPng = opts.format === 'png';
+      const mime = isPng ? 'image/png' : 'image/jpeg';
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        ctx.setStatus(`转换第 ${i}/${pdf.numPages} 页…`);
+        ctx.setProgress((i - 0.6) / pdf.numPages);
+        const canvas = await renderPage(pdf, i, parseInt(opts.dpi, 10) / 72);
+        const blob = await App.canvasToBlob(canvas, mime, isPng ? undefined : 0.9);
+        const embed = isPng
+          ? await out.embedPng(new Uint8Array(await blob.arrayBuffer()))
+          : await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+        const page = await pdf.getPage(i);
+        const vp = page.getViewport({ scale: 1 });
+        const outPage = out.addPage([vp.width, vp.height]);
+        outPage.drawImage(embed, { x: 0, y: 0, width: vp.width, height: vp.height });
+        await App.nextFrame();
+      }
+
+      ctx.setStatus('写入输出文件…');
+      const bytes = await out.save();
+      return [{ name: `${base}-图片化.pdf`, blob: pdfBlob(bytes) }];
+    },
+  });
 })();

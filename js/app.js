@@ -62,6 +62,16 @@
     });
   };
 
+  /** Blob → 纯 base64（不含 data: 前缀），用于 OOXML 内嵌图片 */
+  App.blobToBase64 = function (blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = () => reject(new Error('读取数据失败'));
+      r.readAsDataURL(blob);
+    });
+  };
+
   App.canvasToBlob = function (canvas, type, quality) {
     return new Promise((resolve, reject) =>
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('画布导出失败'))), type, quality)
@@ -738,7 +748,11 @@
       const secs = ((performance.now() - t0) / 1000).toFixed(1);
       App.setStatus(App._keepStatus ? `${App.$('#status').textContent} · 用时 ${secs} 秒` : `用时 ${secs} 秒`);
       const list = App.$('#result-list');
-      list.innerHTML = results
+      if (tool.noFile) {
+        /* 无文件输出类工具（如调起打印），只展示状态 */
+        list.innerHTML = '';
+      } else {
+        list.innerHTML = results
         .map((r, i) => {
           const t = r.blob.type || '';
           const copyable = t.startsWith('text/') || t === 'application/json';
@@ -753,27 +767,28 @@
           </li>`;
         })
         .join('');
-      list.onclick = async (e) => {
-        const btn = e.target.closest('button[data-act]');
-        if (!btn) return;
-        const r = App.state.results[+btn.dataset.i];
-        if (!r) return;
-        if (btn.dataset.act === 'download') {
-          App.download(r.name, r.blob);
-        } else if (btn.dataset.act === 'preview') {
-          App.openPreview(r);
-        } else if (btn.dataset.act === 'copy') {
-          try {
-            await navigator.clipboard.writeText(await r.blob.text());
-            btn.textContent = '已复制';
-            setTimeout(() => (btn.textContent = '复制'), 1500);
-          } catch (err) {
-            App.showError('复制失败：' + (err.message || err));
+        list.onclick = async (e) => {
+          const btn = e.target.closest('button[data-act]');
+          if (!btn) return;
+          const r = App.state.results[+btn.dataset.i];
+          if (!r) return;
+          if (btn.dataset.act === 'download') {
+            App.download(r.name, r.blob);
+          } else if (btn.dataset.act === 'preview') {
+            App.openPreview(r);
+          } else if (btn.dataset.act === 'copy') {
+            try {
+              await navigator.clipboard.writeText(await r.blob.text());
+              btn.textContent = '已复制';
+              setTimeout(() => (btn.textContent = '复制'), 1500);
+            } catch (err) {
+              App.showError('复制失败：' + (err.message || err));
+            }
           }
-        }
-      };
-      App.$('#zip-btn').hidden = results.length < 2;
-      App.$('#results').hidden = false;
+        };
+      }
+      App.$('#zip-btn').hidden = tool.noFile || results.length < 2;
+      App.$('#results').hidden = !!tool.noFile;
     } catch (err) {
       console.error(err);
       App.showError(err && err.message ? err.message : String(err));

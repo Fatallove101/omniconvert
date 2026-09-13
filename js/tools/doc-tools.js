@@ -137,4 +137,48 @@
       return [{ name, blob: htmlBlob(opts.out === 'fragment' ? body : wrapHtml(base, body)) }];
     },
   });
+
+  /* ---------- 4. Word 转 PDF（打印版） ---------- */
+  App.registerTool({
+    id: 'docx-to-pdf',
+    icon: '🖨️',
+    name: 'Word 转 PDF',
+    desc: 'docx 排版后调起打印，在打印对话框选“另存为 PDF”',
+    keywords: 'word docx pdf 打印 转换 导出',
+    category: 'doc',
+    accept: '.docx',
+    acceptText: 'docx 文档（暂不支持 .doc）',
+    multiple: false,
+    noFile: true,
+    async run(files, opts, ctx) {
+      const f = files[0];
+      ctx.setStatus('解析 Word 文档…');
+      const buf = await App.readAsArrayBuffer(f);
+      const r = await mammoth.convertToHtml({ arrayBuffer: buf });
+      const styled = wrapHtml(baseOf(f.name), r.value).replace(
+        '</style>',
+        '@page{margin:18mm} @media print{body{max-width:none;margin:0;padding:0}} img{max-width:100%}</style>'
+      );
+
+      /* 隐藏 iframe 内排版并调起系统打印 → 用户选择“另存为 PDF” */
+      ctx.setStatus('请在新弹出的打印对话框中选择“另存为 PDF”', true);
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0.01';
+      document.body.appendChild(iframe);
+      const idoc = iframe.contentDocument;
+      idoc.open();
+      idoc.write(styled);
+      idoc.close();
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          App.showError('打印调起失败：' + (e.message || e));
+        }
+      }, 700);
+      setTimeout(() => iframe.remove(), 5 * 60 * 1000);
+      return [];
+    },
+  });
 })();
