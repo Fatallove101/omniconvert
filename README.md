@@ -45,14 +45,26 @@
 | 图片 | 尺寸调整 | 按百分比或指定宽高 |
 | 图片 | HEIC 转 JPG | iPhone 照片转通用格式 |
 | 图片 | ICO 图标生成 | 多尺寸 Windows / 网站图标（16~256） |
-| 歌曲 | 歌曲格式转换 | NCM(网易云)、QMC/MFLAC/MGG(QQ音乐)、KWM(酷我) 转为 MP3/FLAC/OGG（引擎：unlock-music WASM） |
-| KGG | KGG 格式转换 | 酷狗 KGG/KGMA/KGM/VPR 转为 MP3/FLAC/OGG（v3 离线直解；v5 需按提示提供 eKey 或密钥库） |
+| 歌曲 | 歌曲格式转换 | NCM(网易云)、QQ 音乐 QMC 老格式(qmc0/qmc3/qmcflac/qmcogg/qmcm) 转 MP3/FLAC/OGG —— 密钥就在文件里，**确定可离线解**（引擎：unlock-music WASM） |
+| 歌曲 | 密钥格式转换 | **需要密钥的格式统一入口**：酷狗 KGG/KGM/KGMA/VPR、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms。能离线解的先自动解（酷狗 v1/v2/v3 等），确实需要密钥时弹窗按平台教你取密钥（酷狗密钥库 / 该曲 eKey） |
 | 文档 | Word 转 PDF | docx 排版后调起打印「另存为 PDF」（适合普通文档） |
 | 文档 | Excel ↔ CSV | xlsx/xls ↔ csv，自动识别方向 |
 | 文档 | Word 转 HTML | docx → HTML 网页或纯文本 |
 | 文档 | Markdown 转 HTML | 输出带样式的完整网页 |
 
-> **歌曲转换的边界**：本工具做的是"解密还原"——去掉加密壳得到**原本就封装在内**的 MP3/FLAC/OGG（音质无损），**不做有损转码**（如 FLAC→MP3 需要音频编码器 ffmpeg，本项目不内置音频编码器）。QQ 音乐新版 MFLAC/MGG 有两种：页脚**内嵌明文 eKey** 的（直接解密）；以及页脚为 **`musicex` 结构、文件里不含 eKey** 的——这类文件的密钥只存在于 QQ 音乐客户端**运行期**，靠 Frida 之类的手段挂进客户端进程才能取到，而本页面是纯浏览器程序，没有这种能力。因此遇到这种文件时：要么改用**客户端侧导出**（客户端自带的转换/导出，或支持"运行期解密"的桌面工具），要么在弹窗里提供该曲 eKey 由本页面离线完成——拿不到 eKey 时只会明确报错，不会输出打不开的文件。酷我 KWM v2 需要单独提取的密钥，暂不支持。仅限解密你拥有合法权利的个人歌曲文件。
+> **歌曲转换的边界**：本工具做的是"解密还原"——去掉加密壳得到**原本就封装在内**的 MP3/FLAC/OGG（音质无损），**不做有损转码**（如 FLAC→MP3 需要音频编码器 ffmpeg，本项目不内置音频编码器）。
+>
+> 两个歌曲工具的分工：**「歌曲格式转换」**只收密钥一定在文件里的格式（网易云 ncm、QQ 老 QMC），拖进去必成功；**「密钥格式转换」**收所有**可能需要该曲密钥**的格式，内部先自动尝试离线路径，只有确实需要密钥时才弹窗引导。各平台情况：
+>
+> | 平台 | 格式 | 离线情况 | 需要密钥时怎么办 |
+> | --- | --- | --- | --- |
+> | 网易云 | ncm | ✅ 密钥内嵌 | 不需要 |
+> | QQ 音乐 | qmc0/qmc3/qmcflac/qmcogg/qmcm | ✅ 静态映射 | 不需要 |
+> | QQ 音乐 | mflac/mgg/mgg1/mmp4 | 页脚含明文 eKey 的可解；**`musicex` 页脚不含 eKey** | 客户端侧导出（客户端自带转换/导出，或用支持"运行期解密"的桌面工具，需 QQ 音乐在运行），或粘贴该曲 eKey |
+> | 酷狗 | kgm/kgma/vpr/kgg | v1/v2/v3 可离线（v3 用内置解码器 + 离线公钥） | v5：选密钥库 `KGMusicV3.db` 自动提取，或粘贴该曲 eKey |
+> | 酷我 | kwm/kwms | v1 可离线 | v2/kwms：粘贴从客户端取得的该曲 eKey（本工具用酷我 v2 密钥通道**尽力尝试**，解不出会明确报错） |
+>
+> 拿不到密钥时只会**明确报错说明原因**，绝不会输出一个打不开的文件。仅限解密你拥有合法权利的个人歌曲文件。
 
 > **关于"高保真可编辑转换"的边界**：PDF→Word/PPT 目前是图片型（版式 100% 还原但文字不可编辑）或文本型（可编辑但不还原排版）；PDF→Excel（表格结构还原）、Word→PDF 的高保真版式，需要 LibreOffice 等重引擎，本项目保持纯浏览器端实现，不包含这类重引擎。
 
@@ -158,8 +170,8 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert    
 ### 已知边界
 
 - 歌曲转换只做「解密还原」，不做有损转码（FLAC→MP3 需要音频编码器，本项目不内置）
-- KGG v5 需要每首歌各自的 eKey（可用密钥库 `KGMusicV3.db` 自动提取）；酷我 KWM v2 暂不支持
-- QQ 音乐新版 mgg/mflac（页脚 `musicex` 结构）文件里**不含 eKey**：本页面拿不到客户端运行期的密钥，请改用**客户端侧导出**，或在弹窗里提供该曲 eKey；两者都没有时会明确报错说明原因，不会像以前那样输出一个打不开的文件
+- 需要密钥的格式统一放「密钥格式转换」：酷狗 KGG/KGM/KGMA/VPR、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms；能离线解的先自动解，需要密钥时按平台弹窗引导（酷狗可自动读 `KGMusicV3.db`）
+- QQ 音乐新版页脚（`musicex` 结构）与酷我 v2/kwms 的密钥不在文件里：本页面拿不到客户端运行期的密钥，请改用**客户端侧导出**，或在弹窗里提供该曲 eKey（酷我 v2 为尽力尝试）；拿不到时会明确报错说明原因，不会像以前那样输出一个打不开的文件
 - 扫描件 PDF 提取文本需要 OCR；PDF→Word/PPT 是图片型或文本型，PDF→Excel 需要 LibreOffice 级重引擎——本项目保持纯浏览器端，不含这些重引擎
 
 ## 合规与风险边界
@@ -190,3 +202,11 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert    
 ## 测试
 
 `test/make-fixtures.ps1` 生成各类测试文件（PNG/JPG/双页PDF/CSV/XLSX/DOCX/MD）。已实测通过的流程：合并、拆分、转图片、图片转 PDF、压缩、提取文本、加水印（含中文渲染）、旋转、图片三件套、Excel↔CSV 双向、Word→HTML/TXT、Markdown→HTML。
+
+自检脚本（Node，零依赖，用仓库自带的 `vendor/um/loader-inline.js` 做引擎）：
+
+- `node test/check-music.mjs <文件或目录>` —— **歌曲体检**：逐个文件判断「✅ 可离线解密 / 🔑 需要密钥 / ❓ 无法判断 / ⛔ 不支持」，并给出该平台的取密钥方法；覆盖 ncm、qmc*、mflac/mgg/mmp4、kgm/kgma/kgg/vpr、kwm/kwms
+- `node test/test-qmc-mgg.mjs` —— 密钥流程与输出自检（绝不静默产出打不开的文件）
+- `node test/test-key-tool.mjs` —— 「密钥格式转换」工具层（旧链接兼容、扩展名分组、三平台引导文案）
+- `node test/test-state-sharing.mjs` —— 框架与工具的状态共享（页面重排 / 图片排序）
+- `node test/test-kggdb.mjs`、`node test/test-v5.mjs` —— 密钥库解密与 KGG v5 流程

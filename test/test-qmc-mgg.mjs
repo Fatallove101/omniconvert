@@ -46,6 +46,7 @@ function xor(bytes, key) {
 
 let qmc1Calls = 0;
 let qmc2Keys = [];
+let kuwoV2Keys = [];
 
 const fakeUm = {
   QMCFooter: {
@@ -83,7 +84,26 @@ const fakeUm = {
     const h = Buffer.from(head.subarray(0, 4)).toString('latin1');
     if (h === 'OggS') return { audioType: 'ogg', needMore: 0 };
     if (h === 'fLaC') return { audioType: 'flac', needMore: 0 };
+    /* mp4/m4a：byterange 4..8 == 'ftyp' */
+    const brand = Buffer.from(head.subarray(4, 8)).toString('latin1');
+    if (brand === 'ftyp') return { audioType: 'm4a', needMore: 0 };
     return { audioType: 'bin', needMore: 0 };
+  },
+  KWMDecipherV1: class {
+    /* 桩：v1 解出来永远是垃圾（用来模拟 v2/kwms 文件），构造器不校验 */
+    decrypt(buf) {
+      const kb = Buffer.from('WRONG-KEY');
+      for (let i = 0; i < buf.length; i++) buf[i] ^= kb[i % kb.length] ^ 0x5a;
+    }
+  },
+  kuwoV2CipherFactory(ekey) {
+    kuwoV2Keys.push(ekey);
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(ekey)) throw new Error('EKey: Failed to decode b64 content');
+    return {
+      decrypt(buf) {
+        buf.set(xor(buf, ekey));
+      },
+    };
   },
 };
 
@@ -121,8 +141,9 @@ App.askMusicEkey = async (kind, hash) => {
 vm.runInNewContext(fs.readFileSync(path.join(root, 'js', 'tools', 'music-tools.js'), 'utf8'), sandbox, { filename: 'music-tools.js' });
 
 const musicTool = App.tools.find((t) => t.id === 'music-decrypt');
-const kggTool = App.tools.find((t) => t.id === 'kgg-convert');
-check('工具已注册（歌曲 / KGG）', !!musicTool && !!kggTool, App.tools.map((t) => t.id).join(','));
+const keyTool = App.tools.find((t) => t.id === 'key-decrypt');
+check('两个工具已注册（歌曲格式转换 / 密钥格式转换）', !!musicTool && !!keyTool, App.tools.map((t) => t.id).join(','));
+check('密钥格式转换：名称与旧 id 兼容标记', keyTool.name === '密钥格式转换' && (keyTool.legacyIds || []).includes('kgg-convert'), keyTool.name + ' legacy=' + JSON.stringify(keyTool.legacyIds));
 check('App.askMusicEkey 已被调用接口替换为通用密钥弹窗', typeof App.askMusicEkey === 'function');
 
 /* ---------- 合成样本 ---------- */
@@ -199,7 +220,7 @@ const head4 = (u8) => Buffer.from(u8.subarray(0, 4)).toString('latin1');
 askAnswer = null;
 qmc1Calls = 0;
 ASK_CALLS.length = 0;
-let r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
+let r = await runTool(keyTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
 check('① musicex 无 eKey：不产出任何文件（旧代码会产出打不开的 .ogg）', !r.ok && r.results === undefined, r.message);
 check('① 错误提示说明是 musicex 新版变体、无法离线解密', /musicex/.test(r.message || ''), r.message);
 check('① 绝不回落到 decryptQMC1（旧代码的核心缺陷）', qmc1Calls === 0, 'qmc1Calls=' + qmc1Calls);
@@ -208,28 +229,28 @@ check('① 弹窗按 QQ 类型（kind=qmc）并带上 mediaName', ASK_CALLS.leng
 /* ---------- ② musicex 变体：提供正确 eKey ---------- */
 askAnswer = KEY;
 qmc1Calls = 0;
-r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
+r = await runTool(keyTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
 check('② 提供正确 eKey：转换成功且输出 .ogg', r.ok && r.results.length === 1 && /\.ogg$/.test(r.results[0].name), r.ok ? r.results[0].name : r.message);
 check('② 输出内容 = 原 Ogg（页脚 192 字节已正确裁掉）', r.ok && head4(r.results[0].bytes) === 'OggS' && r.results[0].bytes.length === OGG_PLAIN.length, r.ok ? head4(r.results[0].bytes) + ' len=' + r.results[0].bytes.length : r.message);
 check('② 未走 QMC1 回落', qmc1Calls === 0, 'qmc1Calls=' + qmc1Calls);
 
 /* ---------- ③ musicex 变体：eKey 错误（构造通过但解出垃圾） ---------- */
 askAnswer = 'V1JPTkdLRVkxMjM0NTY3OA==';
-r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
+r = await runTool(keyTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
 check('③ eKey 不对：明确报错且不产出文件', !r.ok && /eKey 不正确/.test(r.message || ''), r.message);
 
 /* ---------- ③b 非法 base64 / 漏字符的 eKey：翻译引擎英文报错 ---------- */
 askAnswer = 'NOT-BASE64!!';
-r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
+r = await runTool(keyTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
 check('③b eKey 非法：给出「整段原样复制」的可操作提示', !r.ok && /eKey 无法使用/.test(r.message || '') && /原样复制/.test(r.message || ''), r.message);
 
 /* ---------- ④ 老变体（页脚含明文 eKey）：不弹窗、直接成功 ---------- */
 askAnswer = null;
 ASK_CALLS.length = 0;
-r = await runTool(musicTool, oldVariantMflac(FLAC_PLAIN), 'old.mflac');
+r = await runTool(keyTool, oldVariantMflac(FLAC_PLAIN), 'old.mflac');
 check('④ 老变体 mflac：无需弹窗即成功（页脚明文 eKey）', r.ok && r.results.length === 1 && /\.flac$/.test(r.results[0].name) && ASK_CALLS.length === 0, r.ok ? r.results[0].name + ' asks=' + ASK_CALLS.length : r.message);
 
-/* ---------- ⑤ QMC1 老格式：仍走静态映射 ---------- */
+/* ---------- ⑤ QMC1 老格式：仍走静态映射（留在「歌曲格式转换」） ---------- */
 askAnswer = null;
 qmc1Calls = 0;
 r = await runTool(musicTool, legacyQmc1(FLAC_PLAIN), 'legacy.qmcflac');
@@ -238,9 +259,47 @@ check('⑤ QMC1 老格式仍走 decryptQMC1 且成功', qmc1Calls === 1 && r.ok 
 /* ---------- ⑥ KGG v5：区间应从 audioOffset 起（重构后回归保护） ---------- */
 askAnswer = KEY;
 ASK_CALLS.length = 0;
-r = await runTool(kggTool, kggV5(OGG_PLAIN, 'testhash123'), 'song.kgg');
+r = await runTool(keyTool, kggV5(OGG_PLAIN, 'testhash123'), 'song.kgg');
 check('⑥ KGG v5：弹窗 kind=kgg 且带 audio_hash', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kgg' && ASK_CALLS[0].hash === 'testhash123', JSON.stringify(ASK_CALLS));
 check('⑥ KGG v5：按 [0x400, end) 解密并输出 .ogg', r.ok && /\.ogg$/.test(r.results[0].name) && head4(r.results[0].bytes) === 'OggS', r.ok ? r.results[0].name + ' ' + head4(r.results[0].bytes) : r.message);
+
+/* ---------- ⑦ mmp4（QQ 音乐，图一里的格式）：走 QMC2 同一通道 ---------- */
+askAnswer = KEY;
+ASK_CALLS.length = 0;
+const M4A_PLAIN = (() => {
+  const b = new Uint8Array(4096);
+  Buffer.from('\x00\x00\x00\x20ftypM4A ', 'latin1').copy(Buffer.from(b.buffer), 0);
+  return b;
+})();
+r = await runTool(keyTool, musicexMgg(M4A_PLAIN, 'video.mmp4'), 'video.mmp4');
+check('⑦ mmp4 musicex：弹窗 kind=qmc（QQ 音乐通道）', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'qmc', JSON.stringify(ASK_CALLS));
+check('⑦ mmp4：提供 eKey 后输出 .m4a（嗅探判定）', r.ok && /\.m4a$/.test(r.results[0].name), r.ok ? r.results[0].name : r.message);
+
+/* ---------- ⑧ 酷我 kwms：v1 解不出 → 走酷我 v2 密钥通道 ---------- */
+function kwmSample(plain) {
+  const header = new Uint8Array(0x400);
+  header.fill(0x11);
+  const enc = xor(plain, KEY);
+  const out = new Uint8Array(0x400 + enc.length);
+  out.set(header, 0);
+  out.set(enc, 0x400);
+  return out;
+}
+askAnswer = null;
+ASK_CALLS.length = 0;
+kuwoV2Keys = [];
+r = await runTool(keyTool, kwmSample(FLAC_PLAIN), 'kuwo.kwms');
+check('⑧ kwms：v1 解不出 → 弹窗 kind=kwm（酷我引导）', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kwm', JSON.stringify(ASK_CALLS) + ' / ' + r.message);
+askAnswer = KEY;
+kuwoV2Keys = [];
+r = await runTool(keyTool, kwmSample(FLAC_PLAIN), 'kuwo.kwms');
+check('⑧ kwms：提供 eKey 后走 kuwoV2CipherFactory 并输出 .flac', kuwoV2Keys.length === 1 && r.ok && /\.flac$/.test(r.results[0].name) && head4(r.results[0].bytes) === 'fLaC', 'keys=' + JSON.stringify(kuwoV2Keys) + ' ' + (r.ok ? r.results[0].name : r.message));
+
+/* ---------- ⑨ 两个工具互相指路 ---------- */
+r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
+check('⑨ .mgg 放进「歌曲格式转换」→ 指路「密钥格式转换」', !r.ok && /密钥格式转换/.test(r.message || ''), r.message);
+r = await runTool(keyTool, legacyQmc1(FLAC_PLAIN), 'legacy.qmcflac');
+check('⑨ .qmcflac 放进「密钥格式转换」→ 指路「歌曲格式转换」', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
 
 console.log('');
 if (fail) {

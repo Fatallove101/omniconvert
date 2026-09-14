@@ -45,14 +45,26 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 | Image | Resize | By percentage or exact width/height |
 | Image | HEIC to JPG | iPhone photos to universal formats |
 | Image | ICO Generator | Multi-size Windows / favicon icons (16–256) |
-| Music | Song Conversion | NCM (NetEase), QMC/MFLAC/MGG (QQ Music), KWM (Kuwo) → MP3/FLAC/OGG (engine: unlock-music WASM) |
-| Music | KGG Conversion | KuGou KGG/KGMA/KGM/VPR → MP3/FLAC/OGG (v3 offline; v5 requires per-song eKey) |
+| Music | Song Conversion | NCM (NetEase) and legacy QQ Music QMC (qmc0/qmc3/qmcflac/qmcogg/qmcm) → MP3/FLAC/OGG — the key is inside the file, so these **always decrypt offline** (engine: unlock-music WASM) |
+| Music | Key-based Conversion | **One entry point for formats that may need a key**: KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms. Offline-capable variants are decrypted automatically (KuGou v1/v2/v3 etc.); when a key really is required the dialog explains how to obtain it per platform (KuGou key store / that song's eKey). Legacy link `#/tool/kgg-convert` still works |
 | Document | Word to PDF | Renders docx then opens the print dialog — "Save as PDF" |
 | Document | Excel ↔ CSV | xlsx/xls ↔ csv, direction auto-detected |
 | Document | Word to HTML | docx → styled HTML page or plain text |
 | Document | Markdown to HTML | Standalone styled web page |
 
-> **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, which this project does not bundle). Newer QQ Music MFLAC/MGG files come in two flavours: a footer with a **plaintext eKey** (decrypts directly), and a footer using the **`musicex` layout that contains no eKey at all**. That key only exists inside the *running* QQ Music client and can only be reached by attaching to that process (Frida-style) — something a pure browser page cannot do. So for such files: either use a **client-side export** (the client's own convert/export, or a desktop tool that does runtime decryption), or paste the per-song eKey into the prompt and let this page finish the job offline. Without either, you get a clear error instead of an unplayable file. KWM v2 is not supported. Only convert songs you are legally entitled to.
+> **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, which this project does not bundle).
+>
+> The two music tools split the work: **"Song Conversion"** only accepts formats whose key is inside the file (NetEase ncm, legacy QQ QMC) — those always succeed; **"Key-based Conversion"** accepts every format that *may* need a per-song key, tries the offline path first, and only shows a key dialog when one is genuinely required:
+>
+> | Platform | Formats | Offline? | When a key is needed |
+> | --- | --- | --- | --- |
+> | NetEase | ncm | ✅ key embedded | n/a |
+> | QQ Music | qmc0/qmc3/qmcflac/qmcogg/qmcm | ✅ static map | n/a |
+> | QQ Music | mflac/mgg/mgg1/mmp4 | footer with plaintext eKey decrypts; the **`musicex` footer contains no eKey** | client-side export (the client's own convert/export, or a desktop tool doing runtime decryption while QQ Music runs), or paste that song's eKey |
+> | KuGou | kgm/kgma/vpr/kgg | v1/v2/v3 offline (v3 uses the built-in decoder + offline public key) | v5: pick the `KGMusicV3.db` key store for automatic extraction, or paste the eKey |
+> | Kuwo | kwm/kwms | v1 offline | v2/kwms: paste the eKey obtained from the client (this tool makes a **best-effort** attempt via the Kuwo v2 key path and fails loudly) |
+>
+> Without a key you always get a clear error explaining why — never an unplayable file. Only convert songs you are legally entitled to.
 
 ### UX details
 
@@ -154,8 +166,8 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert   #
 ### Known boundaries
 
 - Music conversion is decryption only — no lossy transcoding (FLAC→MP3 would need an audio encoder, not bundled)
-- KGG v5 needs a per-song eKey (can be extracted automatically from the `KGMusicV3.db` key store); Kuwo KWM v2 is unsupported
-- Newer QQ Music mgg/mflac files (`musicex` footer) contain **no eKey**: this page cannot reach the key that lives inside the running client, so use a **client-side export** or paste that song's eKey into the prompt. With neither, the tool explains the reason clearly instead of silently writing an unplayable file
+- Formats that may need a key all live in **Key-based Conversion**: KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms. Offline-capable variants decrypt automatically; when a key is required the dialog explains how to get it per platform (KuGou can read `KGMusicV3.db` automatically)
+- The newer QQ Music footer (`musicex`) and Kuwo v2/kwms keep their key outside the file: a browser page cannot reach the key inside the running client, so use a **client-side export** or paste that song's eKey (Kuwo v2 is best-effort). Without one you get a clear error instead of an unplayable file
 - OCR for scanned PDFs, and the high fidelity of PDF→Word/PPT/Excel, require heavy engines such as Tesseract or LibreOffice — this project stays browser-only and ships none of them
 
 ## Compliance & Risk Boundary
@@ -191,4 +203,11 @@ All conversions happen inside your browser. Nothing is collected, nothing is upl
 
 ## Testing
 
-`test/` contains fixture generators and self-test suites (`test-um.mjs`, `test-kggdb.mjs`, `test-kgg.mjs`, `test-v5.mjs`, `check-ooxml.ps1`). Run them with Node; they verify MD5/AES against official vectors, key-db decryption round trips, and OOXML well-formedness.
+Node self-test suites (zero dependencies — they drive the repo's own `vendor/um/loader-inline.js` as the engine):
+
+- `node test/check-music.mjs <file-or-dir>` — **music health check**: classifies every encrypted song as `✅ offline` / `🔑 key required` / `❓ unknown` / `⛔ unsupported` and prints where to get the key for that platform; covers ncm, qmc*, mflac/mgg/mmp4, kgm/kgma/kgg/vpr, kwm/kwms
+- `node test/test-qmc-mgg.mjs` — key flows and output self-check (never silently writes an unplayable file)
+- `node test/test-key-tool.mjs` — the "Key-based Conversion" tool layer (legacy link, extension grouping, per-platform prompts)
+- `node test/test-state-sharing.mjs` — framework/tool state sharing (page reorder, image ordering)
+- `node test/test-kggdb.mjs`, `node test/test-v5.mjs` — key-store decryption and the KGG v5 flow
+- `test/check-ooxml.ps1`, `test/make-fixtures.ps1` — OOXML well-formedness and fixture generation
