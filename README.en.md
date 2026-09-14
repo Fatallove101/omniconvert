@@ -52,7 +52,7 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 | Document | Word to HTML | docx → styled HTML page or plain text |
 | Document | Markdown to HTML | Standalone styled web page |
 
-> **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, which this project does not bundle). KGG v5 requires the per-song eKey (embedded in newer files, or paste it manually); KWM v2 is not supported. Only convert songs you are legally entitled to.
+> **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, which this project does not bundle). Newer QQ Music MFLAC/MGG files come in two flavours: a footer with a **plaintext eKey** (decrypts directly), and a footer using the **`musicex` layout that contains no eKey at all** — that key only exists inside the running QQ Music client, so offline decryption requires you to paste the per-song eKey (without it the tool reports a clear error instead of writing an unplayable file). KWM v2 is not supported. Only convert songs you are legally entitled to.
 
 ### UX details
 
@@ -155,6 +155,7 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert   #
 
 - Music conversion is decryption only — no lossy transcoding (FLAC→MP3 would need an audio encoder, not bundled)
 - KGG v5 needs a per-song eKey (can be extracted automatically from the `KGMusicV3.db` key store); Kuwo KWM v2 is unsupported
+- Newer QQ Music mgg/mflac files (`musicex` footer) contain **no plaintext eKey**: decryption depends on you having that song's eKey, and without it the tool reports the reason clearly instead of silently writing an unplayable file
 - OCR for scanned PDFs, and the high fidelity of PDF→Word/PPT/Excel, require heavy engines such as Tesseract or LibreOffice — this project stays browser-only and ships none of them
 
 ## Compliance & Risk Boundary

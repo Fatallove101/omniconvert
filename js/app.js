@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.23',
+    VERSION: 'v1.24',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -769,9 +769,12 @@
     });
   };
 
-  /** KGG v5 eKey 弹窗：支持 ①直接选 KGMusicV3.db 自动提取 ②手动粘贴。
+  /** 音乐解密密钥弹窗：
+   *   kind='kgg' —— 酷狗 KGG v5：可选 KGMusicV3.db 自动提取，或手动粘贴
+   *   kind='qmc' —— QQ 音乐新版 mgg/mflac（musicex 页脚不含明文 eKey）：仅手动粘贴
    *  返回 Promise<string|null>（取消返回 null） */
-  App.askKggEkey = function (audioHash) {
+  App.askMusicEkey = function (kind, audioHash) {
+    const isKgg = kind !== 'qmc';
     return new Promise((resolve) => {
       const old = App.$('#kgg-key-mask');
       if (old) old.remove();
@@ -781,15 +784,20 @@
       mask.innerHTML = `
         <div class="disclaimer-card">
           <div class="disclaimer-icon">🔑</div>
-          <h3>需要该歌曲的 eKey 密钥</h3>
-          <p>该文件为酷狗 KGG v5 加密，每首歌的密钥不同。</p>
+          <h3>${isKgg ? '需要该歌曲的 eKey 密钥' : '需要该歌曲的 eKey（QQ 音乐）'}</h3>
+          ${
+            isKgg
+              ? `<p>该文件为酷狗 KGG v5 加密，每首歌的密钥不同。</p>
           <p><b>方式一（推荐）：</b>选择密钥库文件自动提取。密钥库在登录过酷狗 PC 客户端并下载过这首歌的电脑上：<br>
-             <span class="kgg-path">C:\Users\<用户名>\AppData\Roaming\KuGou8\KGMusicV3.db</span></p>
+             <span class="kgg-path">C:\\Users\\&lt;用户名&gt;\\AppData\\Roaming\\KuGou8\\KGMusicV3.db</span></p>
           <input type="file" id="kgg-db-input" accept=".db" />
           <div id="kgg-db-status" class="muted"></div>
-          <p><b>方式二：</b>手动粘贴该歌曲的 eKey / EncryptionKey：</p>
+          <p><b>方式二：</b>手动粘贴该歌曲的 eKey / EncryptionKey：</p>`
+              : `<p>该文件是新版 QQ 音乐加密（页脚为 <b>musicex</b> 结构，<b>文件里不含明文 eKey</b>）：每首歌的 eKey 只存在于客户端运行期，纯浏览器端拿不到，因此无法离线解密。</p>
+          <p>拿到本曲 eKey 的常见途径：① 在 QQ 音乐客户端下载后由客户端导出通用格式；② 从客户端数据里取出这一首的 eKey。已有 eKey 就粘贴到下面：</p>`
+          }
           <input type="text" id="kgg-ekey-input" class="kgg-input" placeholder="粘贴 eKey / EncryptionKey" autocomplete="off" spellcheck="false" />
-          ${audioHash ? `<p class="muted">本文件音频标识（audio_hash）：${audioHash}</p>` : ''}
+          ${audioHash ? `<p class="muted">${isKgg ? '本文件音频标识（audio_hash）' : '文件内记录的名称（mediaName）'}：${audioHash}</p>` : ''}
           <p class="muted">仅限转换你自己账号下载的歌曲，请支持正版。</p>
           <div class="disclaimer-btns">
             <button type="button" class="disclaimer-cancel">取消</button>
@@ -818,7 +826,8 @@
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') submit();
       });
-      dbInput.addEventListener('change', async () => {
+      /* 密钥库自动提取仅酷狗 KGG v5 适用（QQ 音乐没有这类本地明文密钥库） */
+      if (isKgg && dbInput) dbInput.addEventListener('change', async () => {
         const f = dbInput.files && dbInput.files[0];
         if (!f) return;
         dbStatus.textContent = '检查解密模块…';
@@ -876,6 +885,11 @@
       });
       setTimeout(() => input.focus(), 50);
     });
+  };
+
+  /** 旧调用名（酷狗 KGG v5 路径）保留兼容 */
+  App.askKggEkey = function (audioHash) {
+    return App.askMusicEkey('kgg', audioHash);
   };
 
   App.runTool = async function (id) {

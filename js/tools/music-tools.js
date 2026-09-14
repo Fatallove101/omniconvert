@@ -42,7 +42,9 @@
     kwm: 'mp3',
   };
 
-  /* 这些来源的格式嗅探失败时，允许按扩展名兜底（老格式算法成熟） */
+  /* 这些来源的格式嗅探失败时，允许按扩展名兜底（仅限算法完全确定的老格式：
+   * NCM 与 QMC1 静态映射）。QMC2 系列（mflac/mgg/mgg1）绝不能兜底 ——
+   * 一旦解密路径不对，兜底会把垃圾字节按 .flac/.ogg 交出去，用户拿到的是打不开的文件。 */
   const TRUST_FALLBACK = {
     ncm: 1,
     qmc0: 1,
@@ -50,10 +52,12 @@
     qmcflac: 1,
     qmcogg: 1,
     qmcm: 1,
-    mflac: 1,
-    mgg: 1,
-    mgg1: 1,
   };
+
+  /* QMC1 静态映射格式：无页脚密钥，整文件原位解密 */
+  const QMC1_EXTS = ['qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm'];
+  /* QMC2 格式：密钥要么在页脚里（老变体明文），要么需要用户手动提供（musicex 新变体） */
+  const QMC2_EXTS = ['mflac', 'mgg', 'mgg1'];
 
   /* 两个工具各自接受的扩展名：老酷狗加密(kgm/kgma/vpr)归歌曲转换，仅 .kgg 独立 */
   const MUSIC_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'mflac', 'mgg', 'mgg1', 'kwm', 'kgm', 'kgma', 'vpr'];
@@ -104,7 +108,7 @@
     if (h.version >= 5) {
       /* v5：需要该歌曲的 eKey。抛出特殊错误，由 run() 弹出输入窗口走手动密钥流程 */
       const err = new Error('该文件为 KGG v5 加密，需要该歌曲的 eKey 密钥');
-      err.needEkey = { hash: h.audioHash, audioOffset: h.audioOffset, buf, name };
+      err.needEkey = { kind: 'kgg', hash: h.audioHash, bodyStart: h.audioOffset, bodyEnd: buf.length, buf, name };
       throw err;
     }
     if (h.version >= 3) {
@@ -124,8 +128,13 @@
     return body;
   }
 
-  /** QMC 系列（QQ音乐）：老静态映射(qmc0/3/flac/ogg) 与 内嵌 eKey 的 v2(mflac/mgg) */
+  /** QMC 系列（QQ音乐）：老静态映射(qmc0/3/flac/ogg) 与 内嵌 eKey 的 QMC2(mflac/mgg)
+   *  注意：新版 QQ 音乐 mgg/mflac 的页脚是 musicex 结构，**不含明文 eKey**
+   *  （QMCFooter.parse 能解析出 mediaName 与 size，但 ekey === undefined）。
+   *  这种文件只能拿到该曲 eKey 后手动解密，绝不能回落到 QMC1 静态映射 ——
+   *  那会解出垃圾字节，却仍按扩展名输出成"看起来成功"的文件。 */
   function decQMC(um, buf, name) {
+    const extIn = extOf(name);
     let footer = null;
     const tailN = Math.min(buf.length, 1024);
     try {
@@ -143,7 +152,27 @@
       cipher.decrypt(body, 0);
       return body;
     }
+
+    if (QMC2_EXTS.includes(extIn)) {
+      /* 页脚无明文 eKey：把范围信息交给 run()，由弹窗让用户提供 eKey 后再解 */
+      const err = new Error(
+        footer
+          ? '该文件为新版 QQ 音乐加密（页脚 musicex 结构，不含明文 eKey），纯离线无法解密'
+          : '未能从文件页脚解析出 eKey（文件可能不完整，或属于未知变体）'
+      );
+      err.needEkey = {
+        kind: 'qmc',
+        hash: (footer && footer.mediaName) || '',
+        bodyStart: 0,
+        bodyEnd: Math.max(0, buf.length - ((footer && footer.size) || 0)),
+        buf,
+        name,
+      };
+      throw err;
+    }
+
     /* v1 静态映射：整文件原位解密（无尾部密钥） */
+    if (!QMC1_EXTS.includes(extIn)) throw new Error('未知的 QMC 变体：.' + extIn);
     const body = buf.slice(0);
     um.decryptQMC1(body, 0);
     return body;
@@ -207,7 +236,7 @@
         let ext = det || FALLBACK_EXT[extIn] || null;
         /* 输出自检：识别不出音频类型的，明确报错而不是输出损坏文件 */
         if (!ext || (!det && !TRUST_FALLBACK[extIn])) {
-          throw new Error('转换后无法识别音频格式——该加密变体可能不支持离线转换（如酷狗新版 KGMA v3+，需要联网获取每首歌的密钥）');
+          throw new Error('转换后无法识别音频格式——该加密变体可能不支持离线转换（如酷狗新版 KGMA v3+、QQ 音乐新版 mgg/mflac，都需要每首歌各自的密钥）');
         }
         results.push({
           name: `${baseOf(f.name)}.${ext}`,
@@ -215,15 +244,27 @@
         });
       } catch (e) {
         if (e && e.needEkey) {
-          /* KGG v5：弹出 eKey 输入窗口，用户手动提供密钥 */
+          /* 需要每首歌的 eKey：KGG v5（酷狗）或 QMC2 新版 mgg/mflac（QQ 音乐）
+           * → 弹出对应引导的输入窗口，用户提供密钥后按 QMC2 解密指定区间 */
           const ne = e.needEkey;
-          const ekey = await App.askKggEkey(ne.hash);
+          const ekey = await App.askMusicEkey(ne.kind, ne.hash);
           if (!ekey) {
-            failures.push(`${f.name}：未提供 eKey，已跳过`);
+            /* 把底层原因（musicex 变体 / 页脚读不到 eKey）一并告诉用户，而不是只说"已跳过" */
+            failures.push(`${f.name}：未提供 eKey，已跳过（${e.message || e}）`);
           } else {
             try {
-              const cipher = new um.QMC2(ekey);
-              const body = ne.buf.slice(ne.audioOffset);
+              /* QMC2 的 eKey 是客户端加密封装过的 base64 串（引擎内部还要再解一层），
+               * 乱填/漏字符只会得到英文 Rust 报错，这里翻译成用户能看懂并知道怎么做的提示 */
+              let cipher;
+              try {
+                cipher = new um.QMC2(ekey);
+              } catch (eCipher) {
+                throw new Error(
+                  'eKey 无法使用：请确认整段原样复制（QQ 音乐 eKey 是被客户端加密封装的 base64 串，漏字符或换行都会失败）——' +
+                    (eCipher.message || eCipher)
+                );
+              }
+              const body = ne.buf.slice(ne.bodyStart, ne.bodyEnd);
               cipher.decrypt(body, 0);
               const det = detectExt(um, body);
               if (!det) {
@@ -268,7 +309,7 @@
     category: 'music',
     accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kwm,.kgm,.kgma,.vpr',
     acceptText: 'ncm / qmc* / mflac / mgg / kwm / kgm / kgma / vpr',
-    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（原文件是 FLAC 就输出 FLAC）',
+    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（QQ 新版 mgg/mflac 需按提示提供 eKey）',
     multiple: true,
     minFiles: 1,
     async run(files, opts, ctx) {
