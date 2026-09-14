@@ -11,7 +11,7 @@
  *       [--assets "路径1;路径2"] [--asset-name-prefix OmniConvert] [--prerelease] [--draft]
  *       [--notes-file 文件.md]                          # 用现成文案（默认按 git 历史生成）
  *
- * 令牌：默认从 Git 凭据管理器读取（与 test/release.ps1 同源），也可用环境变量 GH_TOKEN。
+ * 令牌：默认从 Git 凭据管理器读取（与 git push 同源），也可用环境变量 GH_TOKEN。
  * 说明：只做 GitHub API 调用，不改动本地仓库；重复执行是幂等的（已存在则更新文案）。
  * ============================================================ */
 import fs from 'node:fs';

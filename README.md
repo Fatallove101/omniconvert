@@ -24,6 +24,14 @@
 - 手机访问：让手机与电脑连同一 Wi-Fi，把 `server.ps1` 中监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口后访问 `http://<电脑IP>:8137`
 - 正式部署：整个目录是纯静态文件，可直接托管到 GitHub Pages / Nginx / 对象存储 + CDN
 
+## 界面预览
+
+| 首页（含「歌曲格式转换说明」折叠面板） | 歌曲转换 · 使用须知 |
+| --- | --- |
+| ![首页](docs/screenshots/home.png) | ![歌曲转换使用须知](docs/screenshots/music-disclaimer.png) |
+
+> 首页顶部那条可折叠说明写清了：**哪些格式能直接离线解**、**哪些需要密钥以及各平台怎么取密钥**、**哪些还缺少真实样本没有实测**。
+
 ## 功能列表（25 个工具）
 
 | 分类 | 工具 | 说明 |
@@ -101,6 +109,7 @@ omniconvert/
 │   ├── marked.min.js     # Markdown
 │   └── heic2any.min.js   # HEIC 解码
 ├── assets/icons/         # PWA 图标
+├── docs/screenshots/     # README 用的界面截图（不参与打包）
 ├── manifest.webmanifest  # PWA 清单（可安装到桌面/手机主屏）
 ├── sw.js                 # Service Worker：离线缓存（改代码后请升版本号）
 ├── server.ps1            # 零依赖本地静态服务器（TcpListener）
@@ -147,7 +156,7 @@ omniconvert/
 - **WebView2 运行时**：`src-tauri/tauri.conf.json` 里 `webviewInstallMode = downloadBootstrapper`，安装时按需下载运行时，安装包因此只有几 MB
 - **桌面端坚决不开 Service Worker**：`tauri.localhost` 上的旧 SW 一旦劫持导航（其内部 fetch 会被网络 DNS 污染）就会整页白屏，所以 `js/app.js` 检测到 Tauri 环境会主动注销 SW 并清空 Cache，`src-tauri/src/main.rs` 还把 WebView2 用户数据目录指到 `%LOCALAPPDATA%\OmniConvert\WebView2`，从源头保证干净
 - **改了前端必须重新打包**：顺序是先 `make-dist.ps1` 再 `npm run tauri build`；`dist/` 是构建产物，不提交 Git
-- **一键发布**：`test/release.ps1` 从 Git 凭据管理器读令牌 → 创建或复用 Release → 先删同名旧附件再上传两个 exe → 顺带更新仓库简介
+- **一键发布**：`node test/make-releases.mjs --release v0.5.1 --assets "安装包;绿色版"` —— 从 Git 凭据管理器读令牌 → 创建/更新 Release → 按 git 历史自动生成更新说明 → 上传两个 exe；另有 `--backfill-missing`（补齐历史版本）、`--refresh-notes`（重刷说明）、`--mark-old`（旧版加"建议下载最新版"提示并标 pre-release，Latest 只留最新版）
 
 ### 二、部署到本地，用浏览器访问
 

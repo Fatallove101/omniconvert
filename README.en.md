@@ -24,6 +24,14 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 - **Mobile**: connect your phone to the same Wi-Fi, change the listener in `server.ps1` to `IPAddress.Any`, allow port 8137 in the firewall, then visit `http://<PC-IP>:8137`
 - **Production**: the whole directory is pure static files — host it on GitHub Pages / Cloudflare Pages / EdgeOne Pages / Nginx for free
 
+## Screenshots
+
+| Home page (with the collapsible music note) | Song conversion · usage notice |
+| --- | --- |
+| ![Home](docs/screenshots/home.png) | ![Song conversion notice](docs/screenshots/music-disclaimer.png) |
+
+> The collapsible panel at the top of the home page spells out **which formats decrypt offline**, **which need a key and how to obtain it per platform**, and **which ones still lack real samples and are untested**.
+
 ## Features (25 tools)
 
 | Category | Tool | Description |
@@ -97,6 +105,7 @@ omniconvert/
 │   ├── pptx/             # pptxgenjs (PPTX writer)
 │   ├── um/               # unlock-music WASM + KGG public key prefix
 │   └── sqljs/            # sql.js (read the KuGou key database)
+├── docs/screenshots/     # README screenshots (not shipped in the build)
 ├── miniprogram/          # WeChat Mini Program skeleton (see its README)
 ├── src-tauri/            # Windows desktop app (Tauri v2)
 ├── server.ps1            # Zero-dependency local static server (TcpListener)
@@ -143,7 +152,7 @@ Packaging details and pitfalls (all of them encoded in the source):
 - **WebView2 runtime**: `webviewInstallMode = downloadBootstrapper` in `src-tauri/tauri.conf.json` downloads the runtime during setup, which keeps the installer a few MB
 - **The desktop build never registers a Service Worker**: a stale SW on `tauri.localhost` hijacks navigation (its internal fetch gets DNS-poisoned on some networks) and whitescreens the window. `js/app.js` therefore unregisters any SW and clears caches when it detects Tauri, and `src-tauri/src/main.rs` points the WebView2 user-data folder at `%LOCALAPPDATA%\OmniConvert\WebView2` to start clean
 - **Frontend changes require a rebuild**: run `make-dist.ps1` first, then `npm run tauri build`. `dist/` is a build output and is not committed
-- **One-command release**: `test/release.ps1` reads the token from Git Credential Manager, creates or reuses the Release, deletes same-named old assets, uploads both exes, and updates the repo description
+- **One-command release**: `node test/make-releases.mjs --release v0.5.1 --assets "installer;portable"` — reads the token from Git Credential Manager, creates/updates the Release, generates the changelog from git history, and uploads both exes. Extra modes: `--backfill-missing` (create releases for old tags), `--refresh-notes` (regenerate notes), `--mark-old` (banner + pre-release flag on older versions so only the newest keeps the Latest badge)
 
 ### 2. Local deployment and browser access
 
