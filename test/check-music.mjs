@@ -40,11 +40,16 @@ export const PLATFORMS = {
   kuwo: { name: '酷我音乐', exts: ['kwm', 'kwms'] },
 };
 /** 扩展到工具的归属（App 里两个歌曲工具按此分组，自检会校验两边一致）：
- *  SONG_TOOL_EXTS —— 「歌曲格式转换」：正常不需要密钥的格式；
- *  KEY_TOOL_EXTS  —— 「密钥格式转换」：可能需要该曲密钥的格式。 */
-export const SONG_TOOL_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'kgm', 'kgma', 'vpr'];
-export const KEY_TOOL_EXTS = ['kgg', 'mflac', 'mgg', 'mgg1', 'mmp4', 'kwm', 'kwms'];
-export const ALL_EXTS = [...new Set([...KEY_TOOL_EXTS, ...SONG_TOOL_EXTS])];
+ *  ALWAYS_OFFLINE_EXTS —— 密钥在文件里 / 静态映射，任何变体都能离线解；
+ *  AMBIGUOUS_EXTS      —— **扩展名分不出来**的：同名格式可能是可离线的老变体，
+ *                         也可能是需要该曲密钥的新变体（酷狗 v5、QQ musicex、酷我 v2/kwms）；
+ *  SONG_TOOL_EXTS      —— 「歌曲格式转换」受理全部格式，先试离线，解不开的引导去密钥工具；
+ *  KEY_TOOL_EXTS       —— 「密钥格式转换」受理这些模糊格式，就地弹窗引导取密钥。 */
+export const ALWAYS_OFFLINE_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm'];
+export const AMBIGUOUS_EXTS = ['kgm', 'kgma', 'vpr', 'kgg', 'mflac', 'mgg', 'mgg1', 'mmp4', 'kwm', 'kwms'];
+export const SONG_TOOL_EXTS = [...ALWAYS_OFFLINE_EXTS, ...AMBIGUOUS_EXTS];
+export const KEY_TOOL_EXTS = [...AMBIGUOUS_EXTS];
+export const ALL_EXTS = [...SONG_TOOL_EXTS];
 
 /** 各平台密钥获取方式（体检报告与 App 弹窗共用同一套说法） */
 export const KEY_HINTS = {

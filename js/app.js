@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.27',
+    VERSION: 'v1.28',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -479,6 +479,16 @@
     });
     App.$('#preview-close').addEventListener('click', App.closePreview);
     App.$('#preview-mask').addEventListener('click', App.closePreview);
+
+    /* 从「歌曲格式转换」点引导按钮跳过来时，把已选文件一并带上，省得用户重新挑文件 */
+    if (App._carryFiles && App._carryFiles.length) {
+      const carry = App._carryFiles;
+      App._carryFiles = null;
+      if (id === 'key-decrypt') {
+        App.addFiles(id, carry);
+        App.setStatus(`已把 ${carry.length} 个文件带过来，点「开始转换」即可`, true);
+      }
+    }
   };
 
   App.addFiles = function (id, files) {
@@ -532,6 +542,21 @@
       box.hidden = false;
       box.textContent = '❌ ' + msg;
     }
+  };
+
+  /** 报错 + 一个可点的引导按钮（如：「歌曲格式转换」解不开时 → 去「密钥格式转换」） */
+  App.showErrorWithAction = function (msg, actionLabel, onAction) {
+    const box = App.$('#error-box');
+    if (!box) return;
+    App.showError(msg);
+    if (!actionLabel || !onAction) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'error-action';
+    btn.textContent = actionLabel;
+    btn.addEventListener('click', onAction);
+    box.appendChild(document.createElement('br'));
+    box.appendChild(btn);
   };
 
   /* ---------- 页面重排（organize 类工具） ---------- */
@@ -1012,7 +1037,15 @@
       App.$('#results').hidden = !!tool.noFile;
     } catch (err) {
       console.error(err);
-      App.showError(err && err.message ? err.message : String(err));
+      if (err && err.needsKeyTool) {
+        /* 需要密钥才能解：引导到「密钥格式转换」，并把已选文件一起带过去 */
+        App.showErrorWithAction(err.message, '前往「密钥格式转换」→', () => {
+          App._carryFiles = App.state.files.slice();
+          location.hash = '#/tool/key-decrypt';
+        });
+      } else {
+        App.showError(err && err.message ? err.message : String(err));
+      }
       App.setStatus('');
     } finally {
       App.state.busy = false;

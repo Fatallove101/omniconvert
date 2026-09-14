@@ -105,11 +105,11 @@ check(
   extsOf(keyTool).join(',') + ' vs ' + [...KEY_TOOL_EXTS].sort().join(',')
 );
 check(
-  '「歌曲格式转换」接受的扩展名 = 体检脚本的 SONG_TOOL_EXTS',
+  '「歌曲格式转换」接受的扩展名 = 全部格式（SONG_TOOL_EXTS，含密钥工具那批）',
   JSON.stringify(extsOf(offTool)) === JSON.stringify([...SONG_TOOL_EXTS].sort()),
   extsOf(offTool).join(',') + ' vs ' + [...SONG_TOOL_EXTS].sort().join(',')
 );
-check('酷狗老容器（kgm/kgma/vpr）在「歌曲格式转换」里，.kgg 在「密钥格式转换」里', ['kgm', 'kgma', 'vpr'].every((e) => extsOf(offTool).includes(e)) && extsOf(keyTool).includes('kgg'));
+check('歌曲工具的受理范围包含密钥工具的全部格式（先试离线）', extsOf(keyTool).every((e) => extsOf(offTool).includes(e)));
 check('两个工具都在「歌曲转换」栏目下', keyTool.category === 'music' && offTool.category === 'music');
 check('“可转出”提示写清了需要密钥', /eKey|密钥/.test(keyTool.outputText || ''), keyTool.outputText);
 check('描述里点明覆盖的平台与格式', /酷狗/.test(keyTool.desc) && /QQ/.test(keyTool.desc) && /酷我/.test(keyTool.desc) && /mmp4/.test(keyTool.desc) && /kwms/.test(keyTool.desc), keyTool.desc);

@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classifyFile, loadEngine, loadKgg, ALL_EXTS, SONG_TOOL_EXTS, KEY_TOOL_EXTS, PLATFORMS, KEY_HINTS, platformOf } from './check-music.mjs';
+import { classifyFile, loadEngine, loadKgg, ALL_EXTS, SONG_TOOL_EXTS, KEY_TOOL_EXTS, ALWAYS_OFFLINE_EXTS, AMBIGUOUS_EXTS, PLATFORMS, KEY_HINTS, platformOf } from './check-music.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -167,8 +167,10 @@ const allFromPlatforms = Object.values(PLATFORMS).flatMap((p) => p.exts).sort();
 check('平台格式集合与 ALL_EXTS 完全一致', JSON.stringify(allFromPlatforms) === JSON.stringify([...ALL_EXTS].sort()), allFromPlatforms.join(',') + ' vs ' + [...ALL_EXTS].sort().join(','));
 check('图一四类平台都有取密钥/说明文案', ['netease', 'qq', 'kugou', 'kuwo'].every((p) => !!KEY_HINTS[p]), Object.keys(KEY_HINTS).join(','));
 check('平台归属正确（mmp4→QQ、kwms→酷我、vpr→酷狗、ncm→网易云）', platformOf('mmp4') === 'qq' && platformOf('kwms') === 'kuwo' && platformOf('vpr') === 'kugou' && platformOf('ncm') === 'netease');
-check('两个工具的扩展名集合无交叉', KEY_TOOL_EXTS.every((e) => !SONG_TOOL_EXTS.includes(e)), KEY_TOOL_EXTS.filter((e) => SONG_TOOL_EXTS.includes(e)).join(','));
-check('酷狗老容器（kgm/kgma/vpr）归「歌曲格式转换」，只留 .kgg 在密钥工具', ['kgm', 'kgma', 'vpr'].every((e) => SONG_TOOL_EXTS.includes(e)) && KEY_TOOL_EXTS.includes('kgg'), 'song=' + SONG_TOOL_EXTS.join(',') + ' key=' + KEY_TOOL_EXTS.join(','));
+check('两个工具集合：歌曲工具 = 全部格式，密钥工具 = 扩展名分不出来的那批', JSON.stringify([...SONG_TOOL_EXTS].sort()) === JSON.stringify([...ALL_EXTS].sort()) && JSON.stringify([...KEY_TOOL_EXTS].sort()) === JSON.stringify([...AMBIGUOUS_EXTS].sort()), 'song=' + SONG_TOOL_EXTS.length + ' key=' + KEY_TOOL_EXTS.length);
+check('密钥工具的格式全部包含在歌曲工具里（先试离线、解不开再引导）', KEY_TOOL_EXTS.every((e) => SONG_TOOL_EXTS.includes(e)));
+check('总有离线集的格式只在歌曲工具里（ncm/qmc* 不该出现在密钥工具）', ALWAYS_OFFLINE_EXTS.every((e) => !KEY_TOOL_EXTS.includes(e)), KEY_TOOL_EXTS.join(','));
+check('酷狗老容器（kgm/kgma/vpr）与 kgg 都属"扩展名分不出来"', ['kgm', 'kgma', 'vpr', 'kgg'].every((e) => AMBIGUOUS_EXTS.includes(e)), AMBIGUOUS_EXTS.join(','));
 
 console.log('');
 if (fail) {

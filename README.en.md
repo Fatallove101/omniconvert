@@ -45,8 +45,8 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 | Image | Resize | By percentage or exact width/height |
 | Image | HEIC to JPG | iPhone photos to universal formats |
 | Image | ICO Generator | Multi-size Windows / favicon icons (16–256) |
-| Music | Song Conversion | NCM (NetEase), legacy QQ Music QMC (qmc0/qmc3/qmcflac/qmcogg/qmcm) and legacy KuGou containers (KGM/KGMA/VPR) → MP3/FLAC/OGG — keys live inside the file or in the offline public key, so these **normally need no key** |
-| Music | Key-based Conversion | **One entry point for formats that may need a key**: KuGou KGG, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms. Offline-capable variants decrypt automatically (KuGou v3 etc.); when a key really is required the dialog explains how to obtain it per platform (KuGou key store / that song's eKey). Legacy link `#/tool/kgg-convert` still works |
+| Music | Song Conversion | **Single entry point for encrypted songs**: NetEase NCM, QQ Music QMC/mflac/mgg/mmp4, KuGou KGM/KGMA/VPR/KGG, Kuwo KWM/KWMS → MP3/FLAC/OGG. It tries the offline decryption first, and when a key is required it offers a button to continue in "Key-based Conversion" **carrying your files over** |
+| Music | Key-based Conversion | Formats whose **extension cannot tell** whether a key is needed (KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms): offline-capable variants decrypt directly, otherwise the dialog explains how to obtain the key per platform. Legacy link `#/tool/kgg-convert` still works |
 | Document | Word to PDF | Renders docx then opens the print dialog — "Save as PDF" |
 | Document | Excel ↔ CSV | xlsx/xls ↔ csv, direction auto-detected |
 | Document | Word to HTML | docx → styled HTML page or plain text |
@@ -54,18 +54,18 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 
 > **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, which this project does not bundle).
 >
-> The two music tools split the work: **"Song Conversion"** accepts formats that normally need **no key** (NetEase ncm, legacy QQ QMC, legacy KuGou containers kgm/kgma/vpr); **"Key-based Conversion"** accepts every format that *may* need a per-song key, tries the offline path first, and only shows a key dialog when one is genuinely required:
+> The two music tools work together: **"Song Conversion" is the single entry point** — it accepts **every** encrypted-song format, tries offline decryption itself, and if a per-song key is required it shows a "go to Key-based Conversion" button that **carries your files along**; **"Key-based Conversion"** focuses on those formats whose extension cannot tell whether a key is needed and shows the per-platform key dialog:
 >
-> | Platform | Formats | Offline? | When a key is needed |
-> | --- | --- | --- | --- |
-> | NetEase | ncm | ✅ key embedded (Song Conversion) | n/a |
-> | QQ Music | qmc0/qmc3/qmcflac/qmcogg/qmcm | ✅ static map (Song Conversion) | n/a |
-> | KuGou | kgm/kgma/vpr | ✅ v1/v2 key in header, v3 built-in decoder + offline public key (Song Conversion) | the rare v5 variant asks for a key |
-> | KuGou | kgg | v3 offline; v5 needs the per-song eKey | pick the `KGMusicV3.db` key store for automatic extraction, or paste the eKey |
-> | QQ Music | mflac/mgg/mgg1/mmp4 | footer with plaintext eKey decrypts; the **`musicex` footer contains no eKey** | client-side export (the client's own convert/export, or a desktop tool doing runtime decryption while QQ Music runs), or paste that song's eKey |
-> | Kuwo | kwm/kwms | v1 offline | v2/kwms: paste the eKey obtained from the client (this tool makes a **best-effort** attempt via the Kuwo v2 key path and fails loudly) |
+> | Platform | Formats | Extension tells? | Offline? | When a key is needed |
+> | --- | --- | --- | --- | --- |
+> | NetEase | ncm | yes (always offline) | ✅ key embedded | n/a |
+> | QQ Music | qmc0/qmc3/qmcflac/qmcogg/qmcm | yes (always offline) | ✅ static map | n/a |
+> | KuGou | kgm/kgma/vpr | **no** | ✅ v1/v2 key in header, v3 built-in decoder + offline public key | the rare v5 variant: use Key-based Conversion + eKey / key store |
+> | KuGou | kgg | **no** | v3 offline | v5: pick the `KGMusicV3.db` key store for automatic extraction, or paste the eKey |
+> | QQ Music | mflac/mgg/mgg1/mmp4 | **no** | footer with plaintext eKey decrypts | the **`musicex` footer contains no eKey**: client-side export (the client's own convert/export, or a desktop tool doing runtime decryption while QQ Music runs), or paste that song's eKey |
+> | Kuwo | kwm/kwms | **no** | v1 offline | v2/kwms: paste the eKey obtained from the client (a **best-effort** attempt via the Kuwo v2 key path that fails loudly) |
 >
-> **KuGou is judged by the version number inside the file**: the same `.kgma` extension decrypts directly at v1/v2/v3 and only asks for a key at v5. Without a key you always get a clear error explaining why — never an unplayable file. Only convert songs you are legally entitled to.
+> **Everything is decided from the file content, never from the extension**: KuGou by the version number in the header (same `.kgma`, v1/v2/v3 decrypt, only v5 asks), QQ by the footer layout, Kuwo by trial-decrypting once. Without a key you always get a clear error explaining why — never an unplayable file. Only convert songs you are legally entitled to.
 
 ### UX details
 
@@ -167,7 +167,7 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert   #
 ### Known boundaries
 
 - Music conversion is decryption only — no lossy transcoding (FLAC→MP3 would need an audio encoder, not bundled)
-- Formats that may need a key live in **Key-based Conversion**: KuGou KGG, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms. Offline-capable variants decrypt automatically; when a key is required the dialog explains how to get it per platform (KuGou can read `KGMusicV3.db` automatically). Legacy KuGou containers kgm/kgma/vpr stay in **Song Conversion** and normally need no key
+- Formats that may need a key go through **Key-based Conversion**: KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms. "Song Conversion" also accepts them, tries offline first, and on failure shows a button to continue in the key tool (files carried over)
 - The newer QQ Music footer (`musicex`) and Kuwo v2/kwms keep their key outside the file: a browser page cannot reach the key inside the running client, so use a **client-side export** or paste that song's eKey (Kuwo v2 is best-effort). Without one you get a clear error instead of an unplayable file
 - OCR for scanned PDFs, and the high fidelity of PDF→Word/PPT/Excel, require heavy engines such as Tesseract or LibreOffice — this project stays browser-only and ships none of them
 

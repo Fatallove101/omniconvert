@@ -223,7 +223,7 @@ async function runTool(tool, bytes, name) {
     for (const r of results) out.push({ name: r.name, bytes: new Uint8Array(await r.blob.arrayBuffer()) });
     return { ok: true, results: out };
   } catch (e) {
-    return { ok: false, message: e && e.message ? e.message : String(e) };
+    return { ok: false, message: e && e.message ? e.message : String(e), needsKeyTool: !!(e && e.needsKeyTool) };
   }
 }
 const head4 = (u8) => Buffer.from(u8.subarray(0, 4)).toString('latin1');
@@ -307,15 +307,18 @@ kuwoV2Keys = [];
 r = await runTool(keyTool, kwmSample(FLAC_PLAIN), 'kuwo.kwms');
 check('⑧ kwms：提供 eKey 后走 kuwoV2CipherFactory 并输出 .flac', kuwoV2Keys.length === 1 && r.ok && /\.flac$/.test(r.results[0].name) && head4(r.results[0].bytes) === 'fLaC', 'keys=' + JSON.stringify(kuwoV2Keys) + ' ' + (r.ok ? r.results[0].name : r.message));
 
-/* ---------- ⑨ 两个工具互相指路 ---------- */
+/* ---------- ⑨ 两个工具的配合：歌曲工具先试离线 → 解不开引导去密钥工具 ---------- */
+ASK_CALLS.length = 0;
 r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
-check('⑨ .mgg 放进「歌曲格式转换」→ 指路「密钥格式转换」', !r.ok && /密钥格式转换/.test(r.message || ''), r.message);
+check('⑨ .mgg 放进「歌曲格式转换」：不弹密钥窗，而是引导去「密钥格式转换」', !r.ok && /密钥格式转换/.test(r.message || '') && ASK_CALLS.length === 0, 'asks=' + ASK_CALLS.length + ' ' + (r.message || '').slice(0, 60));
+check('⑨ 引导标记 needsKeyTool 已置位（页面据此显示跳转按钮）', r.needsKeyTool === true, 'needsKeyTool=' + r.needsKeyTool);
 r = await runTool(keyTool, legacyQmc1(FLAC_PLAIN), 'legacy.qmcflac');
-check('⑨ .qmcflac 放进「密钥格式转换」→ 指路「歌曲格式转换」', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
-r = await runTool(keyTool, kugouFile(FLAC_PLAIN, 3, ''), 'old.kgma');
-check('⑨ .kgma 放进「密钥格式转换」→ 指路「歌曲格式转换」（已调回离线工具）', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
+check('⑨ .qmcflac 放进「密钥格式转换」→ 指路「歌曲格式转换」（永远能离线解的格式）', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
+ASK_CALLS.length = 0;
+r = await runTool(keyTool, kugouFile(FLAC_PLAIN, 1, ''), 'old.kgma');
+check('⑨ .kgma 放进「密钥格式转换」也能直接离线解（受理全部模糊格式）', r.ok && ASK_CALLS.length === 0, (r.ok ? r.results[0].name : r.message) + ' asks=' + ASK_CALLS.length);
 
-/* ---------- ⑩ 酷狗老容器 kgma：v1/v2 离线直解；v5 变体才要密钥 ---------- */
+/* ---------- ⑩ 酷狗老容器 kgma：v1/v2 离线直解；v5 变体要密钥 ---------- */
 askAnswer = null;
 ASK_CALLS.length = 0;
 r = await runTool(musicTool, kugouFile(FLAC_PLAIN, 1, ''), '老歌.kgma');
@@ -330,10 +333,15 @@ check(
   'asks=' + ASK_CALLS.length + ' ' + r.message
 );
 
-askAnswer = KEY;
+askAnswer = null;
 ASK_CALLS.length = 0;
 r = await runTool(musicTool, kugouFile(OGG_PLAIN, 5, 'hashKGMA5'), '新歌.kgma');
-check('⑩ kgma v5 变体：即使在离线工具里也会弹密钥引导（不静默失败）', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kgg' && r.ok, JSON.stringify(ASK_CALLS) + ' ' + (r.ok ? r.results[0].name : r.message));
+check('⑩ kgma v5 在「歌曲格式转换」：不弹窗，引导去「密钥格式转换」', !r.ok && r.needsKeyTool === true && /密钥格式转换/.test(r.message || '') && ASK_CALLS.length === 0, 'asks=' + ASK_CALLS.length + ' ' + (r.message || '').slice(0, 60));
+
+askAnswer = KEY;
+ASK_CALLS.length = 0;
+r = await runTool(keyTool, kugouFile(OGG_PLAIN, 5, 'hashKGMA5'), '新歌.kgma');
+check('⑩ 同一个 kgma v5 在「密钥格式转换」：弹密钥引导并可解出', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kgg' && r.ok, JSON.stringify(ASK_CALLS) + ' ' + (r.ok ? r.results[0].name : r.message));
 
 console.log('');
 if (fail) {
