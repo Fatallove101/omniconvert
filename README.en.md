@@ -22,7 +22,7 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 - **Mobile**: connect your phone to the same Wi-Fi, change the listener in `server.ps1` to `IPAddress.Any`, allow port 8137 in the firewall, then visit `http://<PC-IP>:8137`
 - **Production**: the whole directory is pure static files — host it on GitHub Pages / Cloudflare Pages / EdgeOne Pages / Nginx for free
 
-## Features (24 tools)
+## Features (25 tools)
 
 | Category | Tool | Description |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 | Document | Word to HTML | docx → styled HTML page or plain text |
 | Document | Markdown to HTML | Standalone styled web page |
 
-> **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, see roadmap). KGG v5 requires the per-song eKey (embedded in newer files, or paste it manually); KWM v2 is not supported. Only convert songs you are legally entitled to.
+> **Scope of music conversion**: this is *decryption* — it removes the encryption wrapper and recovers the audio file stored inside (lossless, format unchanged). It does **not** transcode (e.g. FLAC→MP3 needs an audio encoder, which this project does not bundle). KGG v5 requires the per-song eKey (embedded in newer files, or paste it manually); KWM v2 is not supported. Only convert songs you are legally entitled to.
 
 ### UX details
 
@@ -93,34 +93,69 @@ omniconvert/
 
 **Adding a tool**: call `App.registerTool({ id, name, desc, icon, category, accept, multiple, options, run })` in `js/tools/` — the home grid, routing, progress bar, preview and download/zip all come for free.
 
-## Desktop app (Tauri)
+## Product guide
 
-Requirements: Rust (MSVC) + Node + VS Build Tools. Then:
+### Delivery formats
+
+| Form | How to get it | Notes |
+| --- | --- | --- |
+| Web app (local) | Double-click `start.bat`, or run `server.ps1` yourself | Zero-dependency local static server, open `http://localhost:8137` |
+| Web app (public) | Host the plain static directory on GitHub Pages / Nginx / object storage + CDN | No backend, no database, no server cost |
+| PWA | "Install app / Add to home screen" in the browser | `sw.js` caches the app shell, works offline |
+| Windows desktop app | [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest) — installer or portable | Tauri + WebView2 shell wrapping the same frontend, still zero upload |
+| WeChat Mini Program | `miniprogram/` skeleton | In-app Canvas + pdf-lib; heavy work goes to a cloud function (see `miniprogram/README.md`) |
+
+### 1. How the Windows desktop app is built
+
+The desktop build is **not a second codebase**: `make-dist.ps1` copies the static assets into `dist/`, Tauri embeds `dist/` into the shell, and the window loads those local files through WebView2 — so every conversion still happens 100% on the machine.
+
+1. Requirements: Rust (MSVC toolchain) + Node.js + VS Build Tools (C++ workload; `install-buildtools.bat` installs it in one click)
+2. Build (the order actually used and tested here):
+
+   ```
+   npm install
+   powershell -ExecutionPolicy Bypass -File make-dist.ps1   # copy clean static assets to dist/
+   npm run tauri build
+   ```
+
+3. Two artifacts:
+   - **Portable**: `src-tauri/target/release/omniconvert.exe` (~10 MB, run it directly, no console window)
+   - **Installer**: `src-tauri/target/release/bundle/nsis/*-setup.exe` (NSIS wizard with Start menu entry and uninstaller)
+
+Packaging details and pitfalls (all of them encoded in the source):
+
+- **Icons**: replace `assets/icons/icon-512.png`, then run `npm run tauri icon` to regenerate `ico` / `icns` and every PNG size
+- **WebView2 runtime**: `webviewInstallMode = downloadBootstrapper` in `src-tauri/tauri.conf.json` downloads the runtime during setup, which keeps the installer a few MB
+- **The desktop build never registers a Service Worker**: a stale SW on `tauri.localhost` hijacks navigation (its internal fetch gets DNS-poisoned on some networks) and whitescreens the window. `js/app.js` therefore unregisters any SW and clears caches when it detects Tauri, and `src-tauri/src/main.rs` points the WebView2 user-data folder at `%LOCALAPPDATA%\OmniConvert\WebView2` to start clean
+- **Frontend changes require a rebuild**: run `make-dist.ps1` first, then `npm run tauri build`. `dist/` is a build output and is not committed
+- **One-command release**: `test/release.ps1` reads the token from Git Credential Manager, creates or reuses the Release, deletes same-named old assets, uploads both exes, and updates the repo description
+
+### 2. Local deployment and browser access
 
 ```
-npm install
-powershell -ExecutionPolicy Bypass -File make-dist.ps1   # copy clean static assets to dist/
-npm run tauri build
+Double-click start.bat
+→ starts the local server in a minimized window and opens http://localhost:8137
 ```
 
-Artifacts:
+Or manually, with configurable port and root:
 
-- Portable: `src-tauri/target/release/omniconvert.exe` (~9 MB)
-- Installer: `src-tauri/target/release/bundle/nsis/*-setup.exe` (~3.6 MB)
+```
+powershell -ExecutionPolicy Bypass -File server.ps1                            # default port 8137
+powershell -ExecutionPolicy Bypass -File server.ps1 -Port 9000                 # custom port
+powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert   # custom site root
+```
 
-> Note: the desktop build **disables the Service Worker** and uses its own WebView2 user-data folder — a service worker on `tauri.localhost` gets DNS-poisoned on some networks and breaks navigation.
+`server.ps1` is a zero-dependency TcpListener static server: no admin rights, no IIS / Nginx / Node required. It only does a few things — correct MIME types by extension (including the `.mjs` and `.wasm` needed for packaging), `Cache-Control: no-cache` so edits show up on refresh, directory-traversal protection (403 for anything outside the root), and serving `index.html` for `/`. Close the minimized PowerShell window to stop the server.
 
-## WeChat Mini Program
+- **Mobile / tablet**: put the phone on the same Wi-Fi, change the listener in `server.ps1` to `IPAddress.Any`, allow port 8137 in the firewall, then visit `http://<PC-IP>:8137`
+- **Public hosting**: apart from `src-tauri/`, `test/` and `miniprogram/`, the whole directory is plain static files — drop it on GitHub Pages / Nginx / object storage + CDN. After updating, bump the `CACHE` version in `sw.js` or returning visitors keep the old build
+- **Offline use**: after the first visit the Service Worker caches the app shell listed in `ASSETS` inside `sw.js`; if you add static files, add them there and bump the version
 
-`miniprogram/` contains a ready skeleton: in-browser Canvas image conversion works out of the box, PDF merge/split via pdf-lib (run "Build npm" in DevTools), heavy work goes to a cloud function skeleton. See `miniprogram/README.md`.
+### Known boundaries
 
-## Roadmap
-
-1. **Free static hosting** (EdgeOne Pages / Cloudflare Pages) — publish to a public URL
-2. **Music transcoding** (FLAC→MP3 etc. via ffmpeg.wasm, ~30 MB)
-3. **Server mode** (optional FastAPI + LibreOffice) for high-fidelity Word→PDF, PDF→Excel, OCR
-4. **UI batch 2**: mascot state machine, smart drag-drop detection, tesseract.js OCR
-5. i18n (English UI)
+- Music conversion is decryption only — no lossy transcoding (FLAC→MP3 would need an audio encoder, not bundled)
+- KGG v5 needs a per-song eKey (can be extracted automatically from the `KGMusicV3.db` key store); Kuwo KWM v2 is unsupported
+- OCR for scanned PDFs, and the high fidelity of PDF→Word/PPT/Excel, require heavy engines such as Tesseract or LibreOffice — this project stays browser-only and ships none of them
 
 ## Compliance & Risk Boundary
 

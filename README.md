@@ -22,7 +22,7 @@
 - 手机访问：让手机与电脑连同一 Wi-Fi，把 `server.ps1` 中监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口后访问 `http://<电脑IP>:8137`
 - 正式部署：整个目录是纯静态文件，可直接托管到 GitHub Pages / Nginx / 对象存储 + CDN
 
-## 功能列表（23 个工具）
+## 功能列表（25 个工具）
 
 | 分类 | 工具 | 说明 |
 | --- | --- | --- |
@@ -52,9 +52,9 @@
 | 文档 | Word 转 HTML | docx → HTML 网页或纯文本 |
 | 文档 | Markdown 转 HTML | 输出带样式的完整网页 |
 
-> **歌曲转换的边界**：本工具做的是"解密还原"——去掉加密壳得到**原本就封装在内**的 MP3/FLAC/OGG（音质无损），**不做有损转码**（如 FLAC→MP3 需要音频编码器 ffmpeg，规划在路线图）。新版 QQ 音乐 MFLAC/MGG 文件必须内嵌 eKey（大部分 2020 年后的文件都有）；酷我 KWM v2 需要单独提取的密钥，暂不支持。仅限解密你拥有合法权利的个人歌曲文件。
+> **歌曲转换的边界**：本工具做的是"解密还原"——去掉加密壳得到**原本就封装在内**的 MP3/FLAC/OGG（音质无损），**不做有损转码**（如 FLAC→MP3 需要音频编码器 ffmpeg，本项目不内置音频编码器）。新版 QQ 音乐 MFLAC/MGG 文件必须内嵌 eKey（大部分 2020 年后的文件都有）；酷我 KWM v2 需要单独提取的密钥，暂不支持。仅限解密你拥有合法权利的个人歌曲文件。
 
-> **关于"高保真可编辑转换"的边界**：PDF→Word/PPT 目前是图片型（版式 100% 还原但文字不可编辑）或文本型（可编辑但不还原排版）；PDF→Excel（表格结构还原）、Word→PDF 的高保真版式，需要 LibreOffice 等重引擎，规划在服务端模式（见路线图）。
+> **关于"高保真可编辑转换"的边界**：PDF→Word/PPT 目前是图片型（版式 100% 还原但文字不可编辑）或文本型（可编辑但不还原排版）；PDF→Excel（表格结构还原）、Word→PDF 的高保真版式，需要 LibreOffice 等重引擎，本项目保持纯浏览器端实现，不包含这类重引擎。
 
 ### 体验细节
 
@@ -97,43 +97,69 @@ omniconvert/
 
 **新增工具**：在 `js/tools/` 里调用 `App.registerTool({ id, name, desc, icon, category, accept, multiple, options, run })` 即可，首页卡片、路由、进度条、下载/打包全部自动获得。
 
-## 产品路线图
+## 产品介绍
 
-### 1. 微信小程序 ✅ 骨架已就位（`miniprogram/`）
+### 交付形态一览
 
-- **端内可用**：图片格式转换/压缩/缩放（Canvas 2D）、PDF 合并/拆分（pdf-lib，构建 npm 后可用）
-- **云函数**：`miniprogram/cloudfunctions/convert` 预留 PDF 转图片、Office 转换等重活入口，免运维、免备案
-- **接入步骤**：见 `miniprogram/README.md`（导入开发者工具 → 构建 npm → 部署云函数 → 真机预览）
-- 注意：小程序选择 PDF 走「聊天记录选文件」；自建服务器方案域名必须 HTTPS + ICP 备案
+| 形态 | 怎么拿到 | 说明 |
+| --- | --- | --- |
+| 网页版（本地） | 双击 `start.bat`，或手动跑 `server.ps1` | 零依赖本地静态服务，浏览器开 `http://localhost:8137` |
+| 网页版（公网） | 把纯静态目录托管到 GitHub Pages / Nginx / 对象存储 + CDN | 无后端、无数据库、零服务器成本 |
+| PWA | 浏览器里点「安装应用 / 添加到主屏」 | `sw.js` 缓存应用外壳，断网也能用 |
+| Windows 桌面版 | [Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest) 安装版 / 绿色版 | Tauri + WebView2 外壳，前端原样内嵌，同样零上传 |
+| 微信小程序 | `miniprogram/` 骨架 | 端内 Canvas + pdf-lib，重活留给云函数（见 `miniprogram/README.md`） |
 
-### 2. PC 桌面端 ✅（Tauri 已就绪）
+### 一、PC 桌面版是怎么打包的
 
-前端代码原样打包进 Tauri 壳（WebView2），产物两种：
+桌面版**不是另一套代码**：`make-dist.ps1` 把纯静态资源复制到 `dist/`，Tauri 再把 `dist/` 内嵌进壳，窗口用 WebView2 加载本地文件——所以转换依旧 100% 在本机完成。
 
-- **绿色版**：`src-tauri/target/release/omniconvert.exe`（约 9MB，双击即用）
-- **安装包**：`src-tauri/target/release/bundle/nsis/万象转换_x.y.z_x64-setup.exe`（约 3.6MB，NSIS 向导）
+1. 准备环境：Rust（MSVC toolchain）+ Node.js + VS Build Tools（C++ 生成工具，`install-buildtools.bat` 可一键安装）
+2. 复制运行（本项目实测过的顺序）：
 
-打包步骤（需 Rust MSVC + Node + VS Build Tools）：
+   ```
+   npm install
+   powershell -ExecutionPolicy Bypass -File make-dist.ps1   # 只复制纯静态资源到 dist/
+   npm run tauri build
+   ```
+
+3. 产物两种：
+   - **绿色版**：`src-tauri/target/release/omniconvert.exe`（约 10MB，双击即用，无控制台窗口）
+   - **安装包**：`src-tauri/target/release/bundle/nsis/万象转换_x.y.z_x64-setup.exe`（NSIS 向导，带开始菜单项与卸载）
+
+打包细节与踩过的坑（都已写进代码）：
+
+- **图标**：替换 `assets/icons/icon-512.png` 后运行 `npm run tauri icon`，自动生成 Windows `ico` / macOS `icns` 与各尺寸 png
+- **WebView2 运行时**：`src-tauri/tauri.conf.json` 里 `webviewInstallMode = downloadBootstrapper`，安装时按需下载运行时，安装包因此只有几 MB
+- **桌面端坚决不开 Service Worker**：`tauri.localhost` 上的旧 SW 一旦劫持导航（其内部 fetch 会被网络 DNS 污染）就会整页白屏，所以 `js/app.js` 检测到 Tauri 环境会主动注销 SW 并清空 Cache，`src-tauri/src/main.rs` 还把 WebView2 用户数据目录指到 `%LOCALAPPDATA%\OmniConvert\WebView2`，从源头保证干净
+- **改了前端必须重新打包**：顺序是先 `make-dist.ps1` 再 `npm run tauri build`；`dist/` 是构建产物，不提交 Git
+- **一键发布**：`test/release.ps1` 从 Git 凭据管理器读令牌 → 创建或复用 Release → 先删同名旧附件再上传两个 exe → 顺带更新仓库简介
+
+### 二、部署到本地，用浏览器访问
 
 ```
-npm install
-powershell -ExecutionPolicy Bypass -File make-dist.ps1   # 只复制纯静态资源到 dist/
-npm run tauri build
+双击 start.bat
+→ 自动（最小化窗口）启动本地服务，并打开 http://localhost:8137
 ```
 
-换图标：替换 `assets/icons/icon-512.png` 后运行 `npm run tauri icon`。
+等价的手动方式（可换端口、换站点目录）：
 
-### 3. 服务端模式（可选）
+```
+powershell -ExecutionPolicy Bypass -File server.ps1                             # 默认 8137 端口
+powershell -ExecutionPolicy Bypass -File server.ps1 -Port 9000                  # 换端口
+powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert    # 换站点根目录
+```
 
-Office → PDF 的高保真转换、OCR 需要重引擎（LibreOffice / Tesseract）。可加一个 FastAPI + LibreOffice 的可选后端，界面保持不变，检测到该类任务时上传处理——即 Stirling-PDF 模式。
+`server.ps1` 是一个零依赖的 TcpListener 静态服务器：不需要管理员权限，也不需要 IIS / Nginx / Node。它只做几件事——按扩展名给对 MIME（含打包要用的 `.mjs`、`.wasm`）、发 `Cache-Control: no-cache`（改了代码刷新即生效）、防目录穿越（越界一律 403）、访问 `/` 时回落到 `index.html`。关掉那个最小化的 PowerShell 窗口即停止服务。
 
-### 4. 功能增强
+- **手机 / 平板访问**：让手机与电脑连同一个 Wi-Fi，把 `server.ps1` 的监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口，然后访问 `http://<电脑IP>:8137`
+- **公网部署**：除了 `src-tauri/`、`test/`、`miniprogram/`，整个目录都是纯静态资源，可直接交给 GitHub Pages / Nginx / 对象存储 + CDN；更新后记得升 `sw.js` 里的 `CACHE` 版本号，否则老用户会一直吃缓存
+- **离线可用**：首次访问后 Service Worker 按 `sw.js` 的 `ASSETS` 清单缓存应用外壳，之后断网也能打开（新增静态资源时要同步加进清单并升版本号）
 
-- [x] PDF 加密 / 解密（qpdf-wasm，同 BentoPDF 方案）
-- [x] PDF 页面重排（拖拽排序、删除页）
-- [ ] OCR 文字识别（tesseract.js）
-- [ ] Word → PDF 高保真转换（依赖服务端模式）
-- [ ] 多语言 UI
+### 已知边界
+
+- 歌曲转换只做「解密还原」，不做有损转码（FLAC→MP3 需要音频编码器，本项目不内置）
+- KGG v5 需要每首歌各自的 eKey（可用密钥库 `KGMusicV3.db` 自动提取）；酷我 KWM v2 暂不支持
+- 扫描件 PDF 提取文本需要 OCR；PDF→Word/PPT 是图片型或文本型，PDF→Excel 需要 LibreOffice 级重引擎——本项目保持纯浏览器端，不含这些重引擎
 
 ## 合规与风险边界
 
