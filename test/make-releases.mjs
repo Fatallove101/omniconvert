@@ -22,6 +22,10 @@ const REPO = process.env.GH_REPO || 'Fatallove101/omniconvert';
 const API = 'https://api.github.com';
 const GIT = process.env.GIT_EXE || 'C:\\Program Files\\Git\\cmd\\git.exe';
 
+/* 旧版本正文顶部统一加的那行提示（--mark-old 用；正则用于幂等判断与撤销） */
+const WARN_LINE = `⚠️ 旧版本，建议下载 [最新版](https://github.com/${REPO}/releases/latest)\n\n`;
+const WARN_RE = /^⚠️ 旧版本，建议下载 \[最新版\]\([^)]*\)\n\n/;
+
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
 const val = (f, d = null) => {
@@ -236,6 +240,36 @@ const main = async () => {
     await listState();
     console.log('\n重刷所有 Release 的更新说明：');
     for (const t of tags) await ensureRelease(t, { refreshOnly: true });
+    return 0;
+  }
+  if (has('--mark-old')) {
+    /* 把"非最新版"的 Release 统一处理成：正文顶部加旧版提示 + 标为 pre-release。
+     * 效果：GitHub 的 Latest 徽标只留在最新版上，旧版本不再占据"正式版"位置，
+     *       但附件照旧可下载（回退能力保留）。加 --revert 可原样撤销。 */
+    const revert = has('--revert');
+    const releases = await api('GET', `/repos/${REPO}/releases?per_page=100`);
+    const latest = await api('GET', `/repos/${REPO}/releases/latest`);
+    const latestTag = latest && latest.tag_name;
+    console.log(`最新版（保留 Latest 徽标）= ${latestTag}`);
+    console.log(revert ? '\n撤销旧版标记：' : '\n标记旧版：');
+    for (const r of releases) {
+      if (r.tag_name === latestTag) {
+        console.log(`  跳过 ${r.tag_name}（最新版）`);
+        continue;
+      }
+      let body = r.body || '';
+      if (revert) body = body.replace(WARN_RE, '');
+      else if (!WARN_RE.test(body)) body = WARN_LINE + body;
+      const payload = {
+        tag_name: r.tag_name,
+        name: r.name,
+        body,
+        prerelease: revert ? isPreTag(r.tag_name) : true,
+        draft: r.draft,
+      };
+      await api('PATCH', `/repos/${REPO}/releases/${r.id}`, payload);
+      console.log(`  ${r.tag_name.padEnd(12)} 正文${revert ? '已移除提示' : '已加旧版提示'}，prerelease=${payload.prerelease}，附件保留 ${r.assets.length} 个`);
+    }
     return 0;
   }
   const tag = val('--release');
