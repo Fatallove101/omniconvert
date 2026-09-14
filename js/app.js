@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.22',
+    VERSION: 'v1.23',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -209,6 +209,16 @@
     return App.tools.find((t) => t.id === id) || null;
   };
 
+  /** 重置会话状态：**原地清空**而不是 `App.state = {...}`。
+   *  工具脚本都是 `const App = window.App` 取到的全局对象，只有保持 state 引用稳定，
+   *  工具侧读到的 pages / files 才和框架写的是同一份（页面重排、图片排序依赖它）。 */
+  App.resetState = function (patch) {
+    const s = App.state;
+    for (const k of Object.keys(s)) delete s[k];
+    Object.assign(s, { toolId: null, files: [], results: [], busy: false }, patch || {});
+    return s;
+  };
+
   /* ---------- 最近使用 / 选项记忆（localStorage） ---------- */
 
   App.getRecent = function () {
@@ -251,7 +261,7 @@
   /* ---------- 首页 ---------- */
 
   App.renderHome = function () {
-    App.state = { toolId: null, files: [], results: [], busy: false };
+    App.resetState();
     document.title = '万象转换 OmniConvert — 本地文件格式转换';
 
     const f = App.filter;
@@ -337,7 +347,7 @@
 
   App.renderTool = function (id) {
     const tool = App.getTool(id);
-    App.state = { toolId: id, files: [], results: [], busy: false };
+    App.resetState({ toolId: id });
     document.title = `${tool.name} — 万象转换`;
     /* 歌曲转换 / KGG 转换类工具：进入前先弹使用须知 */
     if (tool.category === 'music' || tool.category === 'kgg') {
@@ -965,8 +975,12 @@
 
   /* ---------- 启动 ---------- */
 
-  /* 合并而非覆盖：保护其它脚本（如 md5/aes）先挂到 App 上的成员 */
-  window.App = Object.assign(window.App || {}, App);
+  /* 合并式挂载：window.App 必须与内部 App 是**同一个对象**。
+   * 工具脚本（js/tools/*.js）一律 `const App = window.App`，若这里交出浅拷贝，
+   * 框架后续对 App 的写入（state 重建等）就传不到工具侧 —— 会出现「PDF 页面重排
+   * 报错」「图片转 PDF 丢失排序/旋转」这类状态失联问题。
+   * 先把（可能存在的）旧 window.App 成员并进来，再把 App 本身暴露出去。 */
+  window.App = Object.assign(App, window.App || {});
   document.addEventListener('DOMContentLoaded', () => {
     App.route();
     window.addEventListener('hashchange', () => App.route());
