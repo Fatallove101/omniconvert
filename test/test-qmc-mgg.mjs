@@ -89,6 +89,16 @@ const fakeUm = {
     if (brand === 'ftyp') return { audioType: 'm4a', needMore: 0 };
     return { audioType: 'bin', needMore: 0 };
   },
+  KuGou: {
+    /* 酷狗 v1/v2 路径桩：真实引擎用 WASM，这里用同一套 XOR 语义 */
+    from_header() {
+      return {
+        decrypt(buf) {
+          buf.set(xor(buf, KEY));
+        },
+      };
+    },
+  },
   KWMDecipherV1: class {
     /* 桩：v1 解出来永远是垃圾（用来模拟 v2/kwms 文件），构造器不校验 */
     decrypt(buf) {
@@ -185,16 +195,18 @@ function oldVariantMflac(plain) {
 function legacyQmc1(plain) {
   return xor(plain, KEY); /* QMC1 静态映射：无页脚 */
 }
-function kggV5(plain, hash) {
+function kugouFile(plain, version, hash) {
   const header = new Uint8Array(0x400);
   header.set(App.KGG.KGM_MAGIC, 0);
   const dv = new DataView(header.buffer);
   dv.setUint32(0x10, 0x400, true); /* audioOffset */
-  dv.setUint32(0x14, 5, true); /* version */
+  dv.setUint32(0x14, version, true); /* version */
   dv.setUint32(0x18, 0, true); /* slot */
-  const hb = Buffer.from(hash, 'utf8');
-  dv.setUint32(0x44, hb.length, true);
-  header.set(hb, 0x48);
+  if (hash) {
+    const hb = Buffer.from(hash, 'utf8');
+    dv.setUint32(0x44, hb.length, true);
+    header.set(hb, 0x48);
+  }
   const enc = xor(plain, KEY);
   const out = new Uint8Array(0x400 + enc.length);
   out.set(header.subarray(0, 0x400), 0);
@@ -259,7 +271,7 @@ check('⑤ QMC1 老格式仍走 decryptQMC1 且成功', qmc1Calls === 1 && r.ok 
 /* ---------- ⑥ KGG v5：区间应从 audioOffset 起（重构后回归保护） ---------- */
 askAnswer = KEY;
 ASK_CALLS.length = 0;
-r = await runTool(keyTool, kggV5(OGG_PLAIN, 'testhash123'), 'song.kgg');
+r = await runTool(keyTool, kugouFile(OGG_PLAIN, 5, 'testhash123'), 'song.kgg');
 check('⑥ KGG v5：弹窗 kind=kgg 且带 audio_hash', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kgg' && ASK_CALLS[0].hash === 'testhash123', JSON.stringify(ASK_CALLS));
 check('⑥ KGG v5：按 [0x400, end) 解密并输出 .ogg', r.ok && /\.ogg$/.test(r.results[0].name) && head4(r.results[0].bytes) === 'OggS', r.ok ? r.results[0].name + ' ' + head4(r.results[0].bytes) : r.message);
 
@@ -300,6 +312,28 @@ r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Lov
 check('⑨ .mgg 放进「歌曲格式转换」→ 指路「密钥格式转换」', !r.ok && /密钥格式转换/.test(r.message || ''), r.message);
 r = await runTool(keyTool, legacyQmc1(FLAC_PLAIN), 'legacy.qmcflac');
 check('⑨ .qmcflac 放进「密钥格式转换」→ 指路「歌曲格式转换」', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
+r = await runTool(keyTool, kugouFile(FLAC_PLAIN, 3, ''), 'old.kgma');
+check('⑨ .kgma 放进「密钥格式转换」→ 指路「歌曲格式转换」（已调回离线工具）', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
+
+/* ---------- ⑩ 酷狗老容器 kgma：v1/v2 离线直解；v5 变体才要密钥 ---------- */
+askAnswer = null;
+ASK_CALLS.length = 0;
+r = await runTool(musicTool, kugouFile(FLAC_PLAIN, 1, ''), '老歌.kgma');
+check('⑩ kgma v1：在「歌曲格式转换」里直接解出，不弹密钥窗', r.ok && /\.flac$/.test(r.results[0].name) && ASK_CALLS.length === 0, (r.ok ? r.results[0].name : r.message) + ' asks=' + ASK_CALLS.length);
+
+askAnswer = null;
+ASK_CALLS.length = 0;
+r = await runTool(musicTool, kugouFile(FLAC_PLAIN, 3, ''), '老歌3.kgma');
+check(
+  '⑩ kgma v3：走离线内置解码器分支（不是密钥分支）',
+  !r.ok && ASK_CALLS.length === 0 && /公钥|DecompressionStream/.test(r.message || ''),
+  'asks=' + ASK_CALLS.length + ' ' + r.message
+);
+
+askAnswer = KEY;
+ASK_CALLS.length = 0;
+r = await runTool(musicTool, kugouFile(OGG_PLAIN, 5, 'hashKGMA5'), '新歌.kgma');
+check('⑩ kgma v5 变体：即使在离线工具里也会弹密钥引导（不静默失败）', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kgg' && r.ok, JSON.stringify(ASK_CALLS) + ' ' + (r.ok ? r.results[0].name : r.message));
 
 console.log('');
 if (fail) {

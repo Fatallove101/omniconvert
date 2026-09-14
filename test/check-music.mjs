@@ -1,20 +1,27 @@
 /* ============================================================
  * 歌曲文件体检 —— 判断哪些加密歌曲**能离线解密**、哪些**必须先拿到密钥**
  *
- * 覆盖平台与格式（与 README 的功能表一致）：
+ * 覆盖平台与格式：
  *   网易云音乐：ncm
  *   QQ 音乐  ：qmc0/qmc3/qmcflac/qmcogg/qmcm（QMC1 静态映射）、mflac/mgg/mgg1/mmp4（QMC2 页脚）
  *   酷狗音乐 ：kgm/kgma/vpr/kgg（按头部版本：v1/v2/v3 可离线，v5 需 eKey）
  *   酷我音乐 ：kwm/kwms（v1 可离线，v2/kwms 需客户端密钥）
  *
+ * 体检方式（只读文件、纯内存，不改动任何文件）：
+ *   1) ncm                —— 解析 NCM 容器头取 audioOffset，真解密一次后嗅探输出类型
+ *   2) qmc0/3/flac/ogg/m  —— 按 QMC1 静态映射真解密一次后嗅探
+ *   3) mflac/mgg/mmp4     —— 解析尾部 1024B 页脚：有明文 eKey 才可能离线；musicex 页脚无 eKey
+ *   4) kgm/kgma/vpr/kgg   —— 读容器头部版本号（0x14）：v1/v2/v3 可离线，v5 需该曲 eKey
+ *   5) kwm/kwms           —— 先按 v1（0x400 头部）真解密一次，解不出即 v2/kwms，需客户端密钥
+ *   结论分四档：✅ 可离线解密 / 🔑 需要密钥 / ❓ 无法判断 / ⛔ 不支持
+ *   （酷狗按“文件里的版本号”判定，所以同一个 .kgma 扩展名：v3 显示 ✅、v5 才显示 🔑）
+ *
  * 用法：
- *   node test/check-music.mjs <文件或目录> [更多路径...] [--no-verify] [--json] [--trial]
+ *   node test/check-music.mjs <文件或目录> [更多路径...] [--no-verify] [--json]
  *   --no-verify  只做结构判定，不实际试解（更快）
  *   --json       以 JSON 输出（便于脚本消费）
- *   --trial      只对“可离线”的文件实际试解一次（默认开启；--no-verify 可关闭）
  *
  * 退出码：0 = 全部可离线；1 = 存在需要密钥/不支持的文件；2 = 参数或环境错误
- * 说明：只读文件、全程在本机内存内完成，不上传任何数据。
  * ============================================================ */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,9 +39,12 @@ export const PLATFORMS = {
   kugou: { name: '酷狗音乐', exts: ['kgm', 'kgma', 'vpr', 'kgg'] },
   kuwo: { name: '酷我音乐', exts: ['kwm', 'kwms'] },
 };
-export const KEY_NEEDED_EXTS = ['kgg', 'kgm', 'kgma', 'vpr', 'mflac', 'mgg', 'mgg1', 'mmp4', 'kwm', 'kwms'];
-export const OFFLINE_ONLY_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm'];
-export const ALL_EXTS = [...new Set([...KEY_NEEDED_EXTS, ...OFFLINE_ONLY_EXTS])];
+/** 扩展到工具的归属（App 里两个歌曲工具按此分组，自检会校验两边一致）：
+ *  SONG_TOOL_EXTS —— 「歌曲格式转换」：正常不需要密钥的格式；
+ *  KEY_TOOL_EXTS  —— 「密钥格式转换」：可能需要该曲密钥的格式。 */
+export const SONG_TOOL_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'kgm', 'kgma', 'vpr'];
+export const KEY_TOOL_EXTS = ['kgg', 'mflac', 'mgg', 'mgg1', 'mmp4', 'kwm', 'kwms'];
+export const ALL_EXTS = [...new Set([...KEY_TOOL_EXTS, ...SONG_TOOL_EXTS])];
 
 /** 各平台密钥获取方式（体检报告与 App 弹窗共用同一套说法） */
 export const KEY_HINTS = {

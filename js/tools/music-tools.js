@@ -53,11 +53,13 @@
   const QMC2_EXTS = ['mflac', 'mgg', 'mgg1', 'mmp4'];
 
   /* 两个工具的扩展名分组（与 test/check-music.mjs 的集合保持一致）：
-   *  OFFLINE_EXTS —— 密钥一定在文件里，能直接离线解；
+   *  OFFLINE_EXTS —— 密钥在文件里 / 有离线公钥，正常都能直接解；
    *  KEY_EXTS     —— 可能需要「该曲密钥」，统一放「密钥格式转换」
-   *                  （工具内部先自动试离线路径，只有确实需要密钥时才弹窗引导）。 */
-  const OFFLINE_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm'];
-  const KEY_EXTS = ['kgg', 'kgm', 'kgma', 'vpr', 'mflac', 'mgg', 'mgg1', 'mmp4', 'kwm', 'kwms'];
+   *                  （工具内部先自动试离线路径，只有确实需要密钥时才弹窗引导）。
+   *  注：酷狗老容器（kgm/kgma/vpr）绝大多数是 v1/v2/v3，可离线直解，因此归「歌曲格式转换」；
+   *      万一遇到 v5 变体，两条路都会按弹窗提示要密钥（不会静默失败）。 */
+  const OFFLINE_EXTS = ['ncm', 'qmc0', 'qmc3', 'qmcflac', 'qmcogg', 'qmcm', 'kgm', 'kgma', 'vpr'];
+  const KEY_EXTS = ['kgg', 'mflac', 'mgg', 'mgg1', 'mmp4', 'kwm', 'kwms'];
 
   function extOf(name) {
     const m = name.match(/\.([a-z0-9]+)$/i);
@@ -313,17 +315,17 @@
     return results;
   }
 
-  /* ---------- 歌曲格式转换（密钥就在文件里，确定可离线） ---------- */
+  /* ---------- 歌曲格式转换（密钥在文件里 / 有离线公钥，正常不需要密钥） ---------- */
   App.registerTool({
     id: 'music-decrypt',
     icon: '🎵',
     name: '歌曲格式转换',
-    desc: '网易云 NCM、QQ 音乐 QMC 老格式（qmc0/qmc3/qmcflac/qmcogg/qmcm）加密歌曲转 MP3 / FLAC / OGG',
-    keywords: 'ncm qmc qmc0 qmc3 qmcflac qmcogg qmcm 网易云音乐 qq音乐 歌曲格式转换 离线',
+    desc: '网易云 NCM、QQ 音乐 QMC 老格式（qmc0/qmc3/qmcflac/qmcogg/qmcm）、酷狗老格式（KGM/KGMA/VPR）加密歌曲转 MP3 / FLAC / OGG',
+    keywords: 'ncm qmc qmc0 qmc3 qmcflac qmcogg qmcm kgm kgma vpr 网易云音乐 qq音乐 酷狗 歌曲格式转换 离线',
     category: 'music',
-    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm',
-    acceptText: 'ncm / qmc0 / qmc3 / qmcflac / qmcogg / qmcm',
-    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（这些格式的密钥就在文件里，无需额外密钥）',
+    accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.kgm,.kgma,.vpr',
+    acceptText: 'ncm / qmc0 / qmc3 / qmcflac / qmcogg / qmcm / kgm / kgma / vpr',
+    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（这些格式正常无需密钥；万一遇到酷狗 v5 变体会弹出密钥引导）',
     multiple: true,
     minFiles: 1,
     async run(files, opts, ctx) {
@@ -331,20 +333,20 @@
     },
   });
 
-  /* ---------- 密钥格式转换（可能需要「该曲密钥」的格式统一入口） ----------
-   *  酷狗：KGG / KGM / KGMA / VPR      —— v1/v2/v3 自动离线解；v5 弹窗引导（KGMusicV3.db 或 eKey）
-   *  QQ  ：mflac / mgg / mgg1 / mmp4   —— 页脚带明文 eKey 的自动解；musicex 变体弹窗引导
-   *  酷我：kwm / kwms                  —— v1 自动解；v2/kwms 弹窗引导                                      */
+  /* ---------- 密钥格式转换（需要「该曲密钥」的格式统一入口） ----------
+   *  酷狗：KGG                              —— v3 自动离线解；v5 弹窗引导（KGMusicV3.db 或 eKey）
+   *  QQ  ：mflac / mgg / mgg1 / mmp4        —— 页脚带明文 eKey 的自动解；musicex 变体弹窗引导
+   *  酷我：kwm / kwms                       —— v1 自动解；v2/kwms 弹窗引导                              */
   App.registerTool({
     id: 'key-decrypt',
     legacyIds: ['kgg-convert'],
     icon: '🔑',
     name: '密钥格式转换',
-    desc: '需要密钥的加密歌曲：酷狗 KGG/KGM/KGMA/VPR、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms → MP3 / FLAC / OGG',
-    keywords: 'kgg kgm kgma vpr mflac mgg mmp4 kwm kwms 酷狗 QQ音乐 酷我 ekey 密钥 密钥格式转换 转换',
+    desc: '需要密钥的加密歌曲：酷狗 KGG、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms → MP3 / FLAC / OGG',
+    keywords: 'kgg mflac mgg mmp4 kwm kwms 酷狗 QQ音乐 酷我 ekey 密钥 密钥格式转换 转换',
     category: 'music',
-    accept: '.kgg,.kgm,.kgma,.vpr,.mflac,.mgg,.mgg1,.mmp4,.kwm,.kwms',
-    acceptText: 'kgg / kgm / kgma / vpr / mflac / mgg / mgg1 / mmp4 / kwm / kwms',
+    accept: '.kgg,.mflac,.mgg,.mgg1,.mmp4,.kwm,.kwms',
+    acceptText: 'kgg / mflac / mgg / mgg1 / mmp4 / kwm / kwms',
     outputText: 'MP3 / FLAC / OGG · 能离线解的直接解（如酷狗 v3）；确实需要密钥时按弹窗提示提供密钥库或该曲 eKey',
     multiple: true,
     minFiles: 1,

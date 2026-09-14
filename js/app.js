@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.26',
+    VERSION: 'v1.27',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
