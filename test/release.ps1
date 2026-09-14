@@ -1,4 +1,6 @@
-﻿# 发布 OmniConvert 桌面版到 GitHub Releases（v0.4.2）
+# 发布 OmniConvert 桌面版到 GitHub Releases（v0.4.2）
+# 注意：批量补齐历史 Release、按 git 历史自动生成更新说明，请用 test/make-releases.mjs；
+#       本脚本是 v0.4.2 时期的单版本脚本，tag 与两个 exe 文件名写死在下面，换版本要手改。
 # 1) 从 Git 凭据管理器读取令牌（不显示） 2) 创建 Release 3) 上传两个安装包 4) 更新仓库简介
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

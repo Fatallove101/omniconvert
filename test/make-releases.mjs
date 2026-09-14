@@ -1,0 +1,237 @@
+/* ============================================================
+ * 批量发布 GitHub Release —— 用 git 历史自动生成更新说明
+ *
+ * 为什么需要它：项目早期只给个别版本建过 Release，导致「做了很多迭代但
+ * Releases 页面只有一条」。本脚本可按 tag 区间补齐历史，并为新版本发正式版。
+ *
+ * 用法（在仓库根目录执行）：
+ *   node test/make-releases.mjs --list                  # 只列出 tag 与 Release 现状，不做改动
+ *   node test/make-releases.mjs --backfill-missing      # 给所有"有 tag 但没 Release"的补建（不含附件）
+ *   node test/make-releases.mjs --release v0.5.0        # 创建/更新某个版本的 Release
+ *       [--assets "路径1;路径2"] [--asset-name-prefix OmniConvert] [--prerelease] [--draft]
+ *       [--notes-file 文件.md]                          # 用现成文案（默认按 git 历史生成）
+ *
+ * 令牌：默认从 Git 凭据管理器读取（与 test/release.ps1 同源），也可用环境变量 GH_TOKEN。
+ * 说明：只做 GitHub API 调用，不改动本地仓库；重复执行是幂等的（已存在则更新文案）。
+ * ============================================================ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+const REPO = process.env.GH_REPO || 'Fatallove101/omniconvert';
+const API = 'https://api.github.com';
+const GIT = process.env.GIT_EXE || 'C:\\Program Files\\Git\\cmd\\git.exe';
+
+const argv = process.argv.slice(2);
+const has = (f) => argv.includes(f);
+const val = (f, d = null) => {
+  const i = argv.indexOf(f);
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : d;
+};
+
+function git(args) {
+  return execFileSync(GIT, args, { encoding: 'utf8' }).trim();
+}
+
+/* ---------- 令牌：优先环境变量，其次 Git 凭据管理器 ---------- */
+function readToken() {
+  if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
+  try {
+    const out = execFileSync(
+      GIT,
+      ['credential', 'fill'],
+      { input: 'protocol=https\nhost=github.com\n\n', encoding: 'utf8' }
+    );
+    const line = out.split(/\r?\n/).find((l) => l.startsWith('password='));
+    if (line) return line.slice('password='.length);
+  } catch (e) {
+    /* 落到下面报错 */
+  }
+  throw new Error('拿不到 GitHub 令牌（请先用 Git 凭据管理器登录一次，或设置 GH_TOKEN）');
+}
+
+const token = readToken();
+const headers = {
+  Authorization: `token ${token}`,
+  'User-Agent': 'omniconvert-release',
+  Accept: 'application/vnd.github+json',
+};
+console.log(`令牌就绪（尾 4 位 ${token.slice(-4)}），仓库 ${REPO}`);
+
+/* ---------- HTTP 层：走 curl，并支持"指定 IP"绕过本机 hosts/DNS 屏蔽 ----------
+ * 背景：有些机器的 hosts 会把 github.com / api.github.com 等指向 127.0.0.1
+ * （本地屏蔽或"加速器"留下的条目），此时 fetch 必然失败。
+ * curl 的 --resolve 优先级高于 hosts，因此用它显式指定 GitHub 边缘 IP。
+ * 正常网络无需这些参数：设 GH_NO_RESOLVE=1 即可关闭。 */
+const CURL = process.env.CURL_EXE || 'curl.exe';
+const RESOLVE_MAP = {
+  'api.github.com': process.env.GH_API_IP || '140.82.112.5',
+  'uploads.github.com': process.env.GH_UPLOAD_IP || '140.82.112.5',
+  'github.com': process.env.GH_WEB_IP || '140.82.112.3',
+};
+const USE_RESOLVE = process.env.GH_NO_RESOLVE !== '1';
+
+function curlJson(method, url, { json = null, binaryFile = null } = {}) {
+  const u = new URL(url);
+  const args = ['-sS', '--max-time', '120', '-X', method, '-w', '\n__HTTP__%{http_code}'];
+  if (USE_RESOLVE && RESOLVE_MAP[u.hostname]) args.push('--resolve', `${u.hostname}:443:${RESOLVE_MAP[u.hostname]}`);
+  for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
+  let input;
+  if (json !== null) {
+    args.push('-H', 'Content-Type: application/json; charset=utf-8', '--data-binary', '@-');
+    input = JSON.stringify(json);
+  } else if (binaryFile) {
+    args.push('-H', 'Content-Type: application/octet-stream', '--data-binary', `@${binaryFile}`);
+  }
+  const out = execFileSync(CURL, [...args, url], { encoding: 'utf8', input, maxBuffer: 32 * 1024 * 1024 });
+  const m = out.match(/\n__HTTP__(\d+)\s*$/);
+  const code = m ? Number(m[1]) : 0;
+  const text = out.replace(/\n__HTTP__\d+\s*$/, '');
+  if (code < 200 || code >= 300) throw new Error(`${method} ${u.pathname} → HTTP ${code} ${text.slice(0, 300)}`);
+  return text ? JSON.parse(text) : null;
+}
+
+const api = (method, url, body, rawFile = null) =>
+  curlJson(method, url.startsWith('http') ? url : API + url, { json: body || null, binaryFile: rawFile });
+
+/* ---------- 版本/tag 事实 ---------- */
+const tags = git(['tag', '--sort=creatordate']).split(/\r?\n/).filter(Boolean);
+function tagDate(t) {
+  return git(['log', '-1', '--format=%ad', '--date=short', t]);
+}
+function commitsBetween(from, to) {
+  const range = from ? `${from}..${to}` : to;
+  return git(['log', range, '--no-merges', '--format=%s']).split(/\r?\n/).filter(Boolean);
+}
+function prevTagOf(t) {
+  const i = tags.indexOf(t);
+  return i > 0 ? tags[i - 1] : null;
+}
+function shortSha(t) {
+  return git(['rev-list', '-n', '1', '--abbrev-commit', t]);
+}
+
+/** 把提交标题按前缀归类成更新说明（真实提交信息，不编造） */
+function buildNotes(tag) {
+  const prev = prevTagOf(tag);
+  const list = commitsBetween(prev, tag);
+  const groups = { feat: [], fix: [], docs: [], other: [] };
+  for (const s of list) {
+    const m = s.match(/^(feat|fix|docs|chore|refactor|style|test|perf)(\([^)]*\))?[:：]\s*(.+)$/);
+    if (m) groups[m[1] === 'feat' || m[1] === 'fix' || m[1] === 'docs' ? m[1] : 'other'].push(m[3]);
+    else groups.other.push(s);
+  }
+  const lines = [];
+  lines.push(`### 本次更新 / Changes（${prev ? `${prev} → ${tag}` : `至 ${tag}`}）`);
+  lines.push('');
+  const section = (title, arr) => {
+    if (!arr.length) return;
+    lines.push(`**${title}**`);
+    for (const x of arr) lines.push(`- ${x}`);
+    lines.push('');
+  };
+  section('✨ 新增功能', groups.feat);
+  section('🐛 修复', groups.fix);
+  section('📚 文档', groups.docs);
+  section('🔧 其他', groups.other);
+  lines.push(`> 提交范围：\`${prev ? shortSha(prev) : '(首个版本)'}..${shortSha(tag)}\`，共 ${list.length} 个提交（${tagDate(tag)}）`);
+  return lines.join('\n');
+}
+
+function bodyFor(tag, extraFooter = '') {
+  const desktopHint =
+    tag === 'v0.5.0'
+      ? '\n### 桌面版下载（Windows 10/11）\n\n| 文件 | 说明 |\n| --- | --- |\n| **OmniConvert_v0.5.0_x64-setup.exe** | 安装版：安装向导 + 开始菜单 + 可卸载 |\n| **OmniConvert_v0.5.0_x64-portable.exe** | 绿色版：双击即用，无需安装 |\n\n🔒 所有转换都在本机完成，文件永不上传。\n'
+      : '';
+  return `${bodyForPrefix(tag)}${buildNotes(tag)}\n${desktopHint}${extraFooter}`;
+}
+function bodyForPrefix(tag) {
+  return `## 万象转换 OmniConvert ${tag}\n\n`;
+}
+
+/* ---------- 主流程 ---------- */
+async function listState() {
+  const releases = await api('GET', `/repos/${REPO}/releases?per_page=100`);
+  const byTag = new Map(releases.map((r) => [r.tag_name, r]));
+  console.log('\n tag            日期        已发 Release?   附件');
+  for (const t of tags) {
+    const r = byTag.get(t);
+    console.log(`  ${t.padEnd(14)} ${tagDate(t)}  ${r ? '是' : '否'}            ${r ? r.assets.length : '-'}`);
+  }
+  return byTag;
+}
+
+async function ensureRelease(tag, { assets = [], prerelease = null, draft = false, notesFile = null } = {}) {
+  const releases = await api('GET', `/repos/${REPO}/releases?per_page=100`);
+  let rel = releases.find((r) => r.tag_name === tag);
+  const body = notesFile ? fs.readFileSync(notesFile, 'utf8') : bodyFor(tag);
+  const isPre = prerelease === null ? /-pre|-beta/.test(tag) : prerelease;
+  const payload = {
+    tag_name: tag,
+    name: `万象转换 ${tag} — 桌面版（网页版同源）`,
+    body,
+    draft,
+    prerelease: isPre,
+  };
+  if (rel) {
+    rel = await api('PATCH', `/repos/${REPO}/releases/${rel.id}`, payload);
+    console.log(`  更新已有 Release ${tag}（id=${rel.id}）`);
+  } else {
+    rel = await api('POST', `/repos/${REPO}/releases`, payload);
+    console.log(`  创建 Release ${tag}（id=${rel.id}，prerelease=${isPre}）`);
+  }
+  for (const a of assets) {
+    const p = path.resolve(a.path);
+    const size = (fs.statSync(p).size / 1048576).toFixed(1);
+    const up = rel.upload_url.split('{')[0] + `?name=${encodeURIComponent(a.name)}`;
+    await api('POST', up, null, p);
+    console.log(`    已上传 ${a.name}（${size} MB）`);
+  }
+  return rel;
+}
+
+const main = async () => {
+  if (has('--list')) {
+    await listState();
+    return 0;
+  }
+  if (has('--backfill-missing')) {
+    const byTag = await listState();
+    console.log('\n补齐缺失的 Release：');
+    for (const t of tags) {
+      if (byTag.has(t)) continue;
+      await ensureRelease(t);
+    }
+    return 0;
+  }
+  const tag = val('--release');
+  if (tag) {
+    const assetsArg = val('--assets', '');
+    const prefix = val('--asset-name-prefix', 'OmniConvert');
+    const assets = assetsArg
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((p) => {
+        const base = path.basename(p);
+        const kind = /setup/i.test(base) ? 'setup' : 'portable';
+        return { path: p, name: `${prefix}_${tag}_x64-${kind}.exe` };
+      });
+    await ensureRelease(tag, {
+      assets,
+      prerelease: has('--prerelease') ? true : has('--no-prerelease') ? false : null,
+      draft: has('--draft'),
+      notesFile: val('--notes-file'),
+    });
+    return 0;
+  }
+  console.log('用法：--list | --backfill-missing | --release <tag> [--assets "a;b"] [--prerelease] [--draft] [--notes-file f.md]');
+  return 2;
+};
+
+main()
+  .then((c) => process.exit(c))
+  .catch((e) => {
+    console.error('失败：' + (e && e.message ? e.message : e));
+    process.exit(1);
+  });
