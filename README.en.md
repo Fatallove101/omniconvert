@@ -45,8 +45,8 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 | Image | Resize | By percentage or exact width/height |
 | Image | HEIC to JPG | iPhone photos to universal formats |
 | Image | ICO Generator | Multi-size Windows / favicon icons (16–256) |
-| Music | Song Conversion | **Single entry point for encrypted songs**: NetEase NCM, QQ Music QMC/mflac/mgg/mmp4, KuGou KGM/KGMA/VPR/KGG, Kuwo KWM/KWMS → MP3/FLAC/OGG. It tries the offline decryption first, and when a key is required it offers a button to continue in "Key-based Conversion" **carrying your files over** |
-| Music | Key-based Conversion | Formats whose **extension cannot tell** whether a key is needed (KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms): offline-capable variants decrypt directly, otherwise the dialog explains how to obtain the key per platform. Legacy link `#/tool/kgg-convert` still works |
+| Music (beta) | Song Conversion | **Single entry point for encrypted songs**: NetEase NCM, QQ Music QMC/mflac/mgg/mmp4, KuGou KGM/KGMA/VPR/KGG, Kuwo KWM/KWMS → MP3/FLAC/OGG. It tries the offline decryption first, and when a key is required it offers a button to continue in "Key-based Conversion" **carrying your files over** |
+| Music (beta) | Key-based Conversion | Formats whose **extension cannot tell** whether a key is needed (KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms): offline-capable variants decrypt directly, otherwise the dialog explains how to obtain the key per platform. Legacy link `#/tool/kgg-convert` still works |
 | Document | Word to PDF | Renders docx then opens the print dialog — "Save as PDF" |
 | Document | Excel ↔ CSV | xlsx/xls ↔ csv, direction auto-detected |
 | Document | Word to HTML | docx → styled HTML page or plain text |

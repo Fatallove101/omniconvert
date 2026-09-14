@@ -214,11 +214,20 @@ function kugouFile(plain, version, hash) {
   return out;
 }
 
-const ctx = { setStatus() {}, setProgress() {} };
+const NOTIFY = []; /* 框架收到的"这些文件需要密钥"汇报 */
+const ctx = {
+  setStatus() {},
+  setProgress() {},
+  notifyNeedKey: (files) => NOTIFY.push(files.map((f) => f.name).join('、')),
+};
 async function runTool(tool, bytes, name) {
   const file = { name, size: bytes.length, bytes };
+  return runToolMulti(tool, [file]);
+}
+async function runToolMulti(tool, files) {
+  NOTIFY.length = 0;
   try {
-    const results = await tool.run([file], {}, ctx);
+    const results = await tool.run(files, {}, ctx);
     const out = [];
     for (const r of results) out.push({ name: r.name, bytes: new Uint8Array(await r.blob.arrayBuffer()) });
     return { ok: true, results: out };
@@ -310,7 +319,7 @@ check('⑧ kwms：提供 eKey 后走 kuwoV2CipherFactory 并输出 .flac', kuwoV
 /* ---------- ⑨ 两个工具的配合：歌曲工具先试离线 → 解不开引导去密钥工具 ---------- */
 ASK_CALLS.length = 0;
 r = await runTool(musicTool, musicexMgg(OGG_PLAIN, MEDIA_NAME), '方大同 - Love Song_H.mgg');
-check('⑨ .mgg 放进「歌曲格式转换」：不弹密钥窗，而是引导去「密钥格式转换」', !r.ok && /密钥格式转换/.test(r.message || '') && ASK_CALLS.length === 0, 'asks=' + ASK_CALLS.length + ' ' + (r.message || '').slice(0, 60));
+check('⑨ .mgg 放进「歌曲格式转换」：不弹密钥窗，而是汇报"需要密钥"（页面据此给跳转按钮）', !r.ok && ASK_CALLS.length === 0 && NOTIFY.length === 1 && /Love Song_H\.mgg/.test(NOTIFY[0]), 'asks=' + ASK_CALLS.length + ' notify=' + JSON.stringify(NOTIFY));
 check('⑨ 引导标记 needsKeyTool 已置位（页面据此显示跳转按钮）', r.needsKeyTool === true, 'needsKeyTool=' + r.needsKeyTool);
 r = await runTool(keyTool, legacyQmc1(FLAC_PLAIN), 'legacy.qmcflac');
 check('⑨ .qmcflac 放进「密钥格式转换」→ 指路「歌曲格式转换」（永远能离线解的格式）', !r.ok && /歌曲格式转换/.test(r.message || ''), r.message);
@@ -336,12 +345,26 @@ check(
 askAnswer = null;
 ASK_CALLS.length = 0;
 r = await runTool(musicTool, kugouFile(OGG_PLAIN, 5, 'hashKGMA5'), '新歌.kgma');
-check('⑩ kgma v5 在「歌曲格式转换」：不弹窗，引导去「密钥格式转换」', !r.ok && r.needsKeyTool === true && /密钥格式转换/.test(r.message || '') && ASK_CALLS.length === 0, 'asks=' + ASK_CALLS.length + ' ' + (r.message || '').slice(0, 60));
+check('⑩ kgma v5 在「歌曲格式转换」：不弹窗，汇报"需要密钥"并置位 needsKeyTool', !r.ok && r.needsKeyTool === true && ASK_CALLS.length === 0 && NOTIFY.length === 1, 'asks=' + ASK_CALLS.length + ' notify=' + JSON.stringify(NOTIFY));
 
 askAnswer = KEY;
 ASK_CALLS.length = 0;
 r = await runTool(keyTool, kugouFile(OGG_PLAIN, 5, 'hashKGMA5'), '新歌.kgma');
 check('⑩ 同一个 kgma v5 在「密钥格式转换」：弹密钥引导并可解出', ASK_CALLS.length === 1 && ASK_CALLS[0].kind === 'kgg' && r.ok, JSON.stringify(ASK_CALLS) + ' ' + (r.ok ? r.results[0].name : r.message));
+
+/* ---------- ⑪ 多文件混跑：部分成功 + 部分要密钥 → 仍要给出引导（用户实测反馈的缺口） ---------- */
+askAnswer = null;
+ASK_CALLS.length = 0;
+const MIX = [
+  { name: '崔伟立、DJ默涵 - 战马 (DJ默涵版).kgma', size: 0, bytes: kugouFile(FLAC_PLAIN, 1, '') },
+  { name: '方大同 - Love Song_H.mgg', size: 0, bytes: musicexMgg(OGG_PLAIN, MEDIA_NAME) },
+  { name: '林俊杰 - 圣所.kgma', size: 0, bytes: kugouFile(FLAC_PLAIN, 1, '') },
+  { name: '李圣杰 - 如果你爱他.kgg', size: 0, bytes: kugouFile(OGG_PLAIN, 5, 'hashKGG') },
+];
+r = await runToolMulti(musicTool, MIX);
+check('⑪ 多文件混跑：能解的正常产出（部分成功不报错）', r.ok && r.results.length === 2, (r.ok ? r.results.map((x) => x.name).join(',') : r.message));
+check('⑪ 多文件混跑：仍汇报"需要密钥"的文件（不再只看全军覆没）', NOTIFY.length === 1 && /Love Song_H\.mgg/.test(NOTIFY[0]) && /如果你爱他\.kgg/.test(NOTIFY[0]), JSON.stringify(NOTIFY));
+check('⑪ 多文件混跑：弹窗一次都没弹（该引导去密钥工具）', ASK_CALLS.length === 0, 'asks=' + ASK_CALLS.length);
 
 console.log('');
 if (fail) {

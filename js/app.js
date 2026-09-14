@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.28',
+    VERSION: 'v1.29',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -14,7 +14,7 @@
       { id: 'pdf', label: 'PDF', icon: '📕' },
       { id: 'image', label: '图片', icon: '🖼️' },
       { id: 'doc', label: '文档', icon: '📄' },
-      { id: 'music', label: '歌曲转换', icon: '🎵' },
+      { id: 'music', label: '歌曲转换（测试中）', icon: '🎵' },
     ],
     filter: { cat: 'all', q: '' },
   };
@@ -536,19 +536,20 @@
     if (s) s.textContent = text || '';
   };
 
-  App.showError = function (msg) {
+  App.showError = function (msg, prefix) {
     const box = App.$('#error-box');
     if (box) {
       box.hidden = false;
-      box.textContent = '❌ ' + msg;
+      box.textContent = (prefix === undefined ? '❌ ' : prefix) + msg;
     }
   };
 
-  /** 报错 + 一个可点的引导按钮（如：「歌曲格式转换」解不开时 → 去「密钥格式转换」） */
-  App.showErrorWithAction = function (msg, actionLabel, onAction) {
+  /** 报错 + 一个可点的引导按钮（如：「歌曲格式转换」解不开时 → 去「密钥格式转换」）
+   *  prefix 传 '🔑 ' 之类可换掉默认的 ❌（"部分成功、部分要密钥"用它更贴切） */
+  App.showErrorWithAction = function (msg, actionLabel, onAction, prefix) {
     const box = App.$('#error-box');
     if (!box) return;
-    App.showError(msg);
+    App.showError(msg, prefix);
     if (!actionLabel || !onAction) return;
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -557,6 +558,21 @@
     btn.addEventListener('click', onAction);
     box.appendChild(document.createElement('br'));
     box.appendChild(btn);
+  };
+
+  /** 工具汇报"这些文件需要密钥"：给出跳转「密钥格式转换」的按钮，并把文件带过去。
+   *  不论全部失败还是"部分成功、部分要密钥"都会走这里。 */
+  App.showNeedKeyGuide = function (files) {
+    if (!files || !files.length) return;
+    App._carryFiles = files.slice();
+    App.showErrorWithAction(
+      `有 ${files.length} 个文件需要密钥、无法离线解密：${files.map((f) => f.name).join('、')}。在「密钥格式转换」里按弹窗提示提供密钥库或该曲 eKey 即可`,
+      '前往「密钥格式转换」→',
+      () => {
+        location.hash = '#/tool/key-decrypt';
+      },
+      '🔑 '
+    );
   };
 
   /* ---------- 页面重排（organize 类工具） ---------- */
@@ -984,6 +1000,8 @@
           App._keepStatus = !!keep;
           App.setStatus(text);
         },
+        /* 工具（歌曲类）汇报"这些文件需要密钥" → 给出跳转引导按钮 */
+        notifyNeedKey: App.showNeedKeyGuide,
       });
       App.state.results = results;
       try {

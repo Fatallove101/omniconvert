@@ -135,6 +135,8 @@ check('弹窗接口存在且旧名兼容', typeof App.askMusicEkey === 'function
 
 /* ---------- 工具总数不变（25），且分类未变 ---------- */
 check('工具注册仍为 25 个（改名不改变数量）', App.tools.length === 25, 'tools=' + App.tools.length);
+check('首页栏目「歌曲转换」标注了（测试中）', /测试中/.test(((App.categories || []).find((c) => c.id === 'music') || {}).label || ''), JSON.stringify((App.categories || []).map((c) => c.label)));
+check('引导入口存在：框架提供"需要密钥"跳转与文件携带', typeof App.showNeedKeyGuide === 'function' && typeof App.showErrorWithAction === 'function');
 
 console.log('');
 if (fail) {

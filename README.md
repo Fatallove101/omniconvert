@@ -45,8 +45,8 @@
 | 图片 | 尺寸调整 | 按百分比或指定宽高 |
 | 图片 | HEIC 转 JPG | iPhone 照片转通用格式 |
 | 图片 | ICO 图标生成 | 多尺寸 Windows / 网站图标（16~256） |
-| 歌曲 | 歌曲格式转换 | **加密歌曲统一入口**：网易云 NCM、QQ 音乐 QMC/mflac/mgg/mmp4、酷狗 KGM/KGMA/VPR/KGG、酷我 KWM/KWMS → MP3/FLAC/OGG。先自动试离线解密，**解不开的会引导你改用「密钥格式转换」并可一键把文件带过去** |
-| 歌曲 | 密钥格式转换 | **扩展名分不出是否需要密钥**的那批（酷狗 KGG/KGM/KGMA/VPR、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms）：能离线解的直接解，需要密钥时弹窗按平台教你找密钥（酷狗密钥库 / 该曲 eKey）；旧链接 `#/tool/kgg-convert` 仍可用 |
+| 歌曲（测试中） | 歌曲格式转换 | **加密歌曲统一入口**：网易云 NCM、QQ 音乐 QMC/mflac/mgg/mmp4、酷狗 KGM/KGMA/VPR/KGG、酷我 KWM/KWMS → MP3/FLAC/OGG。先自动试离线解密，**解不开的会引导你改用「密钥格式转换」并可一键把文件带过去** |
+| 歌曲（测试中） | 密钥格式转换 | **扩展名分不出是否需要密钥**的那批（酷狗 KGG/KGM/KGMA/VPR、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms）：能离线解的直接解，需要密钥时弹窗按平台教你找密钥（酷狗密钥库 / 该曲 eKey）；旧链接 `#/tool/kgg-convert` 仍可用 |
 | 文档 | Word 转 PDF | docx 排版后调起打印「另存为 PDF」（适合普通文档） |
 | 文档 | Excel ↔ CSV | xlsx/xls ↔ csv，自动识别方向 |
 | 文档 | Word 转 HTML | docx → HTML 网页或纯文本 |

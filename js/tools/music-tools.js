@@ -239,6 +239,7 @@
     const results = [];
     const failures = [];
     let needKeyTool = false;
+    const keyNeededFiles = [];
 
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
@@ -271,7 +272,8 @@
            * 「歌曲格式转换」→ 不弹窗，引导用户改用它（并把文件带过去）。 */
           if (!keyPrompt) {
             needKeyTool = true;
-            failures.push(`${f.name}：该文件需要密钥，无法离线解密（${e.message || e}）—— 请改用「密钥格式转换」工具，那里会按平台教你取密钥`);
+            keyNeededFiles.push(f);
+            failures.push(`${f.name}：该文件需要密钥，无法离线解密（${e.message || e}）`);
           } else {
             const ne = e.needEkey;
             const ekey = await App.askMusicEkey(ne.kind, ne.hash);
@@ -315,6 +317,10 @@
       ctx.setProgress((i + 0.9) / files.length);
       await App.nextFrame();
     }
+
+    /* 只要有文件需要密钥，就通知框架给出「前往密钥格式转换」按钮
+     * （关键：多文件里"部分成功、部分要密钥"时也要给，不能只照顾全军覆没的情况） */
+    if (keyNeededFiles.length && typeof ctx.notifyNeedKey === 'function') ctx.notifyNeedKey(keyNeededFiles);
 
     if (!results.length) {
       const err = new Error(failures.length ? failures.join('；') : '没有可转换的文件');
