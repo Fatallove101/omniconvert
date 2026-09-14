@@ -173,6 +173,7 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert    
 - 歌曲转换只做「解密还原」，不做有损转码（FLAC→MP3 需要音频编码器，本项目不内置）
 - 需要密钥的格式统一走「密钥格式转换」：酷狗 KGG/KGM/KGMA/VPR、QQ 音乐 mflac/mgg/mmp4、酷我 kwm/kwms；「歌曲格式转换」也能收这些文件，先试离线，解不开会在页面上给出「前往密钥格式转换」的按钮（文件一并带过去）
 - QQ 音乐新版页脚（`musicex` 结构）与酷我 v2/kwms 的密钥不在文件里：本页面拿不到客户端运行期的密钥，请改用**客户端侧导出**，或在弹窗里提供该曲 eKey（酷我 v2 为尽力尝试）；拿不到时会明确报错说明原因，不会像以前那样输出一个打不开的文件
+- **尚未实测（缺真实样本，可能不工作）**：QQ 音乐 `mmp4`、酷我 `kwm` v2 / `kwms`，以及"手动粘贴 eKey 后解密成功"这两条路径（目前只验证了密钥不对时的报错路径）。已实测成功的：酷狗 `kgm/kgma` 离线直解、酷狗 `kgg` v5 用 `KGMusicV3.db` 自动提取密钥并解密。网易云 `ncm` 与 QQ 老 QMC 由解密引擎保证，但开发机没有样本可测
 - 扫描件 PDF 提取文本需要 OCR；PDF→Word/PPT 是图片型或文本型，PDF→Excel 需要 LibreOffice 级重引擎——本项目保持纯浏览器端，不含这些重引擎
 
 ## 合规与风险边界

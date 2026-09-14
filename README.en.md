@@ -169,6 +169,7 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert   #
 - Music conversion is decryption only — no lossy transcoding (FLAC→MP3 would need an audio encoder, not bundled)
 - Formats that may need a key go through **Key-based Conversion**: KuGou KGG/KGM/KGMA/VPR, QQ Music mflac/mgg/mmp4, Kuwo kwm/kwms. "Song Conversion" also accepts them, tries offline first, and on failure shows a button to continue in the key tool (files carried over)
 - The newer QQ Music footer (`musicex`) and Kuwo v2/kwms keep their key outside the file: a browser page cannot reach the key inside the running client, so use a **client-side export** or paste that song's eKey (Kuwo v2 is best-effort). Without one you get a clear error instead of an unplayable file
+- **Not yet tested (no real samples — may simply not work)**: QQ Music `mmp4`, Kuwo `kwm` v2 / `kwms`, and the "paste an eKey and decrypt successfully" paths (only the wrong-key error path is verified so far). Verified with real files: KuGou `kgm/kgma` offline decryption, and KuGou `kgg` v5 with the eKey auto-extracted from `KGMusicV3.db`. NetEase `ncm` and legacy QQ QMC are guaranteed by the engine but had no sample on the dev machine
 - OCR for scanned PDFs, and the high fidelity of PDF→Word/PPT/Excel, require heavy engines such as Tesseract or LibreOffice — this project stays browser-only and ships none of them
 
 ## Compliance & Risk Boundary

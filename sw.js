@@ -1,5 +1,5 @@
 /* 万象转换 Service Worker — 缓存应用外壳，支持离线使用 */
-const CACHE = 'omniconvert-v1.35';
+const CACHE = 'omniconvert-v1.36';
 const ASSETS = [
   './',
   'index.html',

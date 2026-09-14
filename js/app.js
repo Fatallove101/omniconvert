@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.29',
+    VERSION: 'v1.30',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -288,6 +288,19 @@
         <h1>万象转换</h1>
         <p class="hero-sub">PDF · 图片 · 歌曲 · Office 文档格式转换，全部在你的浏览器里完成，离线可用。</p>
       </section>
+      <details class="notice">
+        <summary>🎵 歌曲格式转换说明（测试中）：哪些能直接解、哪些要密钥、哪些还没实测</summary>
+        <ul>
+          <li><b>直接能解</b>（密钥在文件里 / 有离线公钥）：网易云 NCM，QQ 音乐老格式 <code>qmc0/qmc3/qmcflac/qmcogg/qmcm</code>，酷狗 <code>KGM/KGMA/VPR</code>（v1/v2/v3）。</li>
+          <li><b>需要密钥 → 用「密钥格式转换」</b>：
+            <br>· 酷狗 <code>KGG</code> v5：可选密钥库 <span class="kgg-path">%APPDATA%\\KuGou8\\KGMusicV3.db</span> 自动提取，或粘贴该曲 eKey（<b>已用真实文件实测成功</b>）；
+            <br>· QQ 音乐新版 <code>mflac/mgg</code>：页脚为 <code>musicex</code> 结构、<b>文件里不含 eKey</b>，需客户端侧导出，或粘贴该曲 eKey；
+            <br>· 酷我 <code>kwm/kwms</code> v2：粘贴从客户端取得的该曲 eKey。</li>
+          <li><b>尚未实测（缺真实样本，可能不工作）</b>：QQ 音乐 <code>mmp4</code>、酷我 <code>kwm</code> v2 / <code>kwms</code>，以及"手动粘贴 eKey 后解密成功"这两条路径（目前只验证了密钥不对时的报错路径）。网易云 NCM 与 QQ 老 QMC 由解密引擎保证，但本机没有样本可测。</li>
+          <li><b>想先摸清自己哪些文件要密钥</b>：运行体检脚本 <code>node test/check-music.mjs "你的音乐目录"</code>，会按 ✅ 可离线 / 🔑 需要密钥 分组列出，并给出该平台的取密钥方法。</li>
+          <li>无论哪种格式，处理都在本机浏览器内完成，<b>文件不会上传</b>；拿不到密钥时只会明确报错说明原因，不会输出打不开的文件。</li>
+        </ul>
+      </details>
       <section class="toolbar">
         <input id="search" type="search" placeholder="搜索工具，如：合并、压缩、转 PDF…" value="${f.q.replace(/"/g, '&quot;')}" />
       </section>
