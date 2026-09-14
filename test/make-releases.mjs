@@ -59,15 +59,17 @@ const headers = {
 console.log(`令牌就绪（尾 4 位 ${token.slice(-4)}），仓库 ${REPO}`);
 
 /* ---------- HTTP 层：走 curl，并支持"指定 IP"绕过本机 hosts/DNS 屏蔽 ----------
- * 背景：有些机器的 hosts 会把 github.com / api.github.com 等指向 127.0.0.1
- * （本地屏蔽或"加速器"留下的条目），此时 fetch 必然失败。
+ * 背景：有些机器的 hosts 会把 github.com / api.github.com / uploads.github.com 等
+ * 指向 127.0.0.1（本地屏蔽或"加速器"残留），此时 fetch 必然失败。
  * curl 的 --resolve 优先级高于 hosts，因此用它显式指定 GitHub 边缘 IP。
- * 正常网络无需这些参数：设 GH_NO_RESOLVE=1 即可关闭。 */
+ * 各主机真实 IP 可用公共 DNS 查（本机 hosts 会干扰默认解析）：
+ *   powershell: Resolve-DnsName api.github.com -Server 8.8.8.8 -Type A -DnsOnly
+ * 正常网络无需这些参数：设 GH_NO_RESOLVE=1 即可关闭；也可用下面三个环境变量覆盖。 */
 const CURL = process.env.CURL_EXE || 'curl.exe';
 const RESOLVE_MAP = {
-  'api.github.com': process.env.GH_API_IP || '140.82.112.5',
-  'uploads.github.com': process.env.GH_UPLOAD_IP || '140.82.112.5',
-  'github.com': process.env.GH_WEB_IP || '140.82.112.3',
+  'api.github.com': process.env.GH_API_IP || '20.205.243.168',
+  'uploads.github.com': process.env.GH_UPLOAD_IP || '20.205.243.161',
+  'github.com': process.env.GH_WEB_IP || '20.205.243.166',
 };
 const USE_RESOLVE = process.env.GH_NO_RESOLVE !== '1';
 
@@ -95,7 +97,25 @@ const api = (method, url, body, rawFile = null) =>
   curlJson(method, url.startsWith('http') ? url : API + url, { json: body || null, binaryFile: rawFile });
 
 /* ---------- 版本/tag 事实 ---------- */
-const tags = git(['tag', '--sort=creatordate']).split(/\r?\n/).filter(Boolean);
+const allTags = git(['tag', '--sort=creatordate']).split(/\r?\n/).filter(Boolean);
+
+/** 解析版本号：v1.2.3 / v1.2.3-pre → [1,2,3, isPre]；用于按**版本**（而非 tag 创建顺序）排序 */
+function parseVer(t) {
+  const m = t.match(/^v?(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/);
+  if (!m) return null;
+  return { core: [+m[1], +m[2], +m[3]], pre: m[4] || '' };
+}
+const tags = allTags.slice().sort((a, b) => {
+  const A = parseVer(a);
+  const B = parseVer(b);
+  if (!A || !B) return a.localeCompare(b);
+  for (let i = 0; i < 3; i++) if (A.core[i] !== B.core[i]) return A.core[i] - B.core[i];
+  if (!A.pre && B.pre) return 1; /* 同核心版本：正式版排在 pre 之后 */
+  if (A.pre && !B.pre) return -1;
+  return A.pre.localeCompare(B.pre);
+});
+const isPreTag = (t) => /-pre$|-beta/.test(t);
+
 function tagDate(t) {
   return git(['log', '-1', '--format=%ad', '--date=short', t]);
 }
@@ -103,9 +123,15 @@ function commitsBetween(from, to) {
   const range = from ? `${from}..${to}` : to;
   return git(['log', range, '--no-merges', '--format=%s']).split(/\r?\n/).filter(Boolean);
 }
+/** 上一个参照 tag：正式版看上一个正式版（这样 v0.5.0 的说明覆盖 v0.4.2 以来的全部迭代）；
+ *  pre 版看版本序上的前一个 tag。 */
 function prevTagOf(t) {
   const i = tags.indexOf(t);
-  return i > 0 ? tags[i - 1] : null;
+  if (i <= 0) return null;
+  if (!isPreTag(t)) {
+    for (let j = i - 1; j >= 0; j--) if (!isPreTag(tags[j])) return tags[j];
+  }
+  return tags[i - 1];
 }
 function shortSha(t) {
   return git(['rev-list', '-n', '1', '--abbrev-commit', t]);
@@ -161,11 +187,11 @@ async function listState() {
   return byTag;
 }
 
-async function ensureRelease(tag, { assets = [], prerelease = null, draft = false, notesFile = null } = {}) {
+async function ensureRelease(tag, { assets = [], prerelease = null, draft = false, notesFile = null, refreshOnly = false } = {}) {
   const releases = await api('GET', `/repos/${REPO}/releases?per_page=100`);
   let rel = releases.find((r) => r.tag_name === tag);
   const body = notesFile ? fs.readFileSync(notesFile, 'utf8') : bodyFor(tag);
-  const isPre = prerelease === null ? /-pre|-beta/.test(tag) : prerelease;
+  const isPre = prerelease === null ? isPreTag(tag) : prerelease;
   const payload = {
     tag_name: tag,
     name: `万象转换 ${tag} — 桌面版（网页版同源）`,
@@ -175,11 +201,12 @@ async function ensureRelease(tag, { assets = [], prerelease = null, draft = fals
   };
   if (rel) {
     rel = await api('PATCH', `/repos/${REPO}/releases/${rel.id}`, payload);
-    console.log(`  更新已有 Release ${tag}（id=${rel.id}）`);
+    console.log(`  更新已有 Release ${tag}（id=${rel.id}，附件保留 ${rel.assets.length} 个）`);
   } else {
     rel = await api('POST', `/repos/${REPO}/releases`, payload);
     console.log(`  创建 Release ${tag}（id=${rel.id}，prerelease=${isPre}）`);
   }
+  if (refreshOnly) return rel;
   for (const a of assets) {
     const p = path.resolve(a.path);
     const size = (fs.statSync(p).size / 1048576).toFixed(1);
@@ -202,6 +229,13 @@ const main = async () => {
       if (byTag.has(t)) continue;
       await ensureRelease(t);
     }
+    return 0;
+  }
+  if (has('--refresh-notes')) {
+    /* 只重算更新说明（保留已有附件）——改了区间规则或补了提交后用它刷新 */
+    await listState();
+    console.log('\n重刷所有 Release 的更新说明：');
+    for (const t of tags) await ensureRelease(t, { refreshOnly: true });
     return 0;
   }
   const tag = val('--release');
