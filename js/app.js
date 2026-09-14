@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.24',
+    VERSION: 'v1.25',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -793,8 +793,9 @@
           <input type="file" id="kgg-db-input" accept=".db" />
           <div id="kgg-db-status" class="muted"></div>
           <p><b>方式二：</b>手动粘贴该歌曲的 eKey / EncryptionKey：</p>`
-              : `<p>该文件是新版 QQ 音乐加密（页脚为 <b>musicex</b> 结构，<b>文件里不含明文 eKey</b>）：每首歌的 eKey 只存在于客户端运行期，纯浏览器端拿不到，因此无法离线解密。</p>
-          <p>拿到本曲 eKey 的常见途径：① 在 QQ 音乐客户端下载后由客户端导出通用格式；② 从客户端数据里取出这一首的 eKey。已有 eKey 就粘贴到下面：</p>`
+              : `<p>该文件是<b>新版 QQ 音乐加密</b>（页脚为 <b>musicex</b> 结构，<b>文件里不含 eKey</b>）。每首歌的 eKey 只存在于 QQ 音乐客户端运行期；本页面是纯浏览器程序，无法挂到客户端进程上取密钥，所以没有 eKey 就无法离线解密。</p>
+          <p><b>推荐做法：</b>改用客户端侧导出——QQ 音乐客户端自带的转换 / 导出（如果你的客户端版本提供），或使用支持「运行期解密（需 QQ 音乐保持运行）」的桌面工具；导出的 MP3 / FLAC / OGG 可直接播放，不必经过本页面。</p>
+          <p><b>或者：</b>若你已拿到这一首的 eKey（一长串 base64），粘贴到下面，本页面就能离线完成解密：</p>`
           }
           <input type="text" id="kgg-ekey-input" class="kgg-input" placeholder="粘贴 eKey / EncryptionKey" autocomplete="off" spellcheck="false" />
           ${audioHash ? `<p class="muted">${isKgg ? '本文件音频标识（audio_hash）' : '文件内记录的名称（mediaName）'}：${audioHash}</p>` : ''}

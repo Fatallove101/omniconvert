@@ -157,8 +157,8 @@
       /* 页脚无明文 eKey：把范围信息交给 run()，由弹窗让用户提供 eKey 后再解 */
       const err = new Error(
         footer
-          ? '该文件为新版 QQ 音乐加密（页脚 musicex 结构，不含明文 eKey），纯离线无法解密'
-          : '未能从文件页脚解析出 eKey（文件可能不完整，或属于未知变体）'
+          ? '该文件为新版 QQ 音乐加密（页脚 musicex 结构，不含明文 eKey），本页面无法离线解密；请改用客户端侧导出，或提供该曲 eKey 后重试'
+          : '未能从文件页脚解析出 eKey（文件可能不完整，或属于未知变体）；若这是新版 QQ 音乐文件，请提供该曲 eKey 后重试'
       );
       err.needEkey = {
         kind: 'qmc',
@@ -309,7 +309,7 @@
     category: 'music',
     accept: '.ncm,.qmc0,.qmc3,.qmcflac,.qmcogg,.qmcm,.mflac,.mgg,.mgg1,.kwm,.kgm,.kgma,.vpr',
     acceptText: 'ncm / qmc* / mflac / mgg / kwm / kgm / kgma / vpr',
-    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（QQ 新版 mgg/mflac 需按提示提供 eKey）',
+    outputText: 'MP3 / FLAC / OGG · 自动按歌曲原始格式无损还原（QQ 新版 mgg/mflac 需提供该曲 eKey，或改用客户端侧导出）',
     multiple: true,
     minFiles: 1,
     async run(files, opts, ctx) {
