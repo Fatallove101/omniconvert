@@ -6,6 +6,16 @@ A BentoPDF / Stirling-PDF style file conversion tool that runs **entirely in you
 
 **Zero backend. Zero upload. Works offline (PWA).** Works on both desktop and mobile browsers. Also ships as a Windows desktop app (Tauri) and a WeChat Mini Program skeleton.
 
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="OmniConvert home page (with the collapsible music note)">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/music-disclaimer.png" alt="Song conversion — usage notice">
+</p>
+
+> The collapsible panel at the top of the home page spells out **which formats decrypt offline**, **which need a key and how to obtain it per platform**, and **which ones still lack real samples and are untested**.
+
 ## Quick Start
 
 **Just want the desktop app? [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest)**:
@@ -23,14 +33,6 @@ Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-depende
 
 - **Mobile**: connect your phone to the same Wi-Fi, change the listener in `server.ps1` to `IPAddress.Any`, allow port 8137 in the firewall, then visit `http://<PC-IP>:8137`
 - **Production**: the whole directory is pure static files — host it on GitHub Pages / Cloudflare Pages / EdgeOne Pages / Nginx for free
-
-## Screenshots
-
-| Home page (with the collapsible music note) | Song conversion · usage notice |
-| --- | --- |
-| ![Home](docs/screenshots/home.png) | ![Song conversion notice](docs/screenshots/music-disclaimer.png) |
-
-> The collapsible panel at the top of the home page spells out **which formats decrypt offline**, **which need a key and how to obtain it per platform**, and **which ones still lack real samples and are untested**.
 
 ## Features (25 tools)
 

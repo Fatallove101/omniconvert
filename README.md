@@ -6,6 +6,16 @@
 
 **核心卖点：文件 100% 在本地处理，永不上传服务器。** 无后端、零部署成本、可离线使用（PWA），PC 与手机浏览器均可用。
 
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="万象转换 · 首页（含可折叠的歌曲格式转换说明）">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/music-disclaimer.png" alt="歌曲格式转换 · 使用须知">
+</p>
+
+> 首页顶部那条可折叠说明写清了：**哪些格式能直接离线解**、**哪些需要密钥以及各平台怎么取密钥**、**哪些还缺少真实样本没有实测**。
+
 ## 快速开始
 
 **只想用桌面版？[前往 Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest)**：
@@ -23,14 +33,6 @@
 
 - 手机访问：让手机与电脑连同一 Wi-Fi，把 `server.ps1` 中监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口后访问 `http://<电脑IP>:8137`
 - 正式部署：整个目录是纯静态文件，可直接托管到 GitHub Pages / Nginx / 对象存储 + CDN
-
-## 界面预览
-
-| 首页（含「歌曲格式转换说明」折叠面板） | 歌曲转换 · 使用须知 |
-| --- | --- |
-| ![首页](docs/screenshots/home.png) | ![歌曲转换使用须知](docs/screenshots/music-disclaimer.png) |
-
-> 首页顶部那条可折叠说明写清了：**哪些格式能直接离线解**、**哪些需要密钥以及各平台怎么取密钥**、**哪些还缺少真实样本没有实测**。
 
 ## 功能列表（25 个工具）
 
