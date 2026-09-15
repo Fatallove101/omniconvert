@@ -6,6 +6,8 @@ A BentoPDF / Stirling-PDF style file conversion tool that runs **entirely in you
 
 **Zero backend. Zero upload. Works offline (PWA).** Works on both desktop and mobile browsers. Also ships as a Windows desktop app (Tauri) and a WeChat Mini Program skeleton.
 
+🌐 **Try it online (no install): https://fatallove101.github.io/omniconvert/**
+
 <p align="center">
   <img src="docs/screenshots/home.png" alt="OmniConvert home page (with the collapsible music note)">
 </p>
@@ -127,7 +129,7 @@ omniconvert/
 | Form | How to get it | Notes |
 | --- | --- | --- |
 | Web app (local) | Double-click `start.bat` (safe to re-run), or run `server.ps1` / `start.ps1` yourself | Zero-dependency local static server, open `http://localhost:8137` |
-| Web app (public) | Host the plain static directory on GitHub Pages / Nginx / object storage + CDN | No backend, no database, no server cost |
+| Web app (public) | **Live: https://fatallove101.github.io/omniconvert/** — or host the static directory on GitHub Pages / Nginx / object storage + CDN | No backend, no database, no server cost |
 | PWA | "Install app / Add to home screen" in the browser | `sw.js` caches the app shell, works offline |
 | Windows desktop app | [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest) — installer or portable | Tauri + WebView2 shell wrapping the same frontend, still zero upload |
 | WeChat Mini Program | `miniprogram/` skeleton | In-app Canvas + pdf-lib; heavy work goes to a cloud function (see `miniprogram/README.md`) |
@@ -179,6 +181,17 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert   #
 - **Mobile / tablet**: put the phone on the same Wi-Fi, change the listener in `server.ps1` to `IPAddress.Any`, allow port 8137 in the firewall, then visit `http://<PC-IP>:8137`
 - **Public hosting**: apart from `src-tauri/`, `test/` and `miniprogram/`, the whole directory is plain static files — drop it on GitHub Pages / Nginx / object storage + CDN. After updating, bump the `CACHE` version in `sw.js` or returning visitors keep the old build
 - **Offline use**: after the first visit the Service Worker caches the app shell listed in `ASSETS` inside `sw.js`; if you add static files, add them there and bump the version
+
+### 3. Deploy to the public web (GitHub Pages, free)
+
+This repo ships with an **automatic GitHub Actions deployment** — live at:
+
+🌐 **https://fatallove101.github.io/omniconvert/** (rebuilt on every `push` to `main`)
+
+- **Build**: `scripts/build-web.mjs` copies only `index.html`, `css/`, `js/`, `vendor/`, `assets/`, `manifest.webmanifest` and `sw.js` into `dist/`, writes `.nojekyll` (skips Jekyll), and leaves out `test/`, `src-tauri/` and `miniprogram/`
+- **Publish**: `.github/workflows/pages.yml` runs build → upload-pages-artifact → deploy-pages on every `push` to `main`; the Pages source is set to "GitHub Actions"
+- **Reuse elsewhere**: the repo must be public; enable Pages with `build_type=workflow` via the API (or Settings → Pages → "GitHub Actions")
+- **Other platforms**: Cloudflare Pages / Netlify can point at the same `scripts/build-web.mjs` with `dist` as the output directory — this project needs no custom headers, so any static host works
 
 ### Known boundaries
 

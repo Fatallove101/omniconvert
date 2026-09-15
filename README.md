@@ -6,6 +6,8 @@
 
 **核心卖点：文件 100% 在本地处理，永不上传服务器。** 无后端、零部署成本、可离线使用（PWA），PC 与手机浏览器均可用。
 
+🌐 **在线体验（免安装）：https://fatallove101.github.io/omniconvert/**
+
 <p align="center">
   <img src="docs/screenshots/home.png" alt="万象转换 · 首页（含可折叠的歌曲格式转换说明）">
 </p>
@@ -131,7 +133,7 @@ omniconvert/
 | 形态 | 怎么拿到 | 说明 |
 | --- | --- | --- |
 | 网页版（本地） | 双击 `start.bat`（可重复双击），或手动跑 `server.ps1` / `start.ps1` | 零依赖本地静态服务，浏览器开 `http://localhost:8137` |
-| 网页版（公网） | 把纯静态目录托管到 GitHub Pages / Nginx / 对象存储 + CDN | 无后端、无数据库、零服务器成本 |
+| 网页版（公网） | **在线体验 https://fatallove101.github.io/omniconvert/**，或自行托管到 GitHub Pages / Nginx / 对象存储 + CDN | 无后端、无数据库、零服务器成本 |
 | PWA | 浏览器里点「安装应用 / 添加到主屏」 | `sw.js` 缓存应用外壳，断网也能用 |
 | Windows 桌面版 | [Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest) 安装版 / 绿色版 | Tauri + WebView2 外壳，前端原样内嵌，同样零上传 |
 | 微信小程序 | `miniprogram/` 骨架 | 端内 Canvas + pdf-lib，重活留给云函数（见 `miniprogram/README.md`） |
@@ -183,6 +185,17 @@ powershell -ExecutionPolicy Bypass -File server.ps1 -Root D:\www\omniconvert    
 - **手机 / 平板访问**：让手机与电脑连同一个 Wi-Fi，把 `server.ps1` 的监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口，然后访问 `http://<电脑IP>:8137`
 - **公网部署**：除了 `src-tauri/`、`test/`、`miniprogram/`，整个目录都是纯静态资源，可直接交给 GitHub Pages / Nginx / 对象存储 + CDN；更新后记得升 `sw.js` 里的 `CACHE` 版本号，否则老用户会一直吃缓存
 - **离线可用**：首次访问后 Service Worker 按 `sw.js` 的 `ASSETS` 清单缓存应用外壳，之后断网也能打开（新增静态资源时要同步加进清单并升版本号）
+
+### 三、部署到公网（GitHub Pages，免费）
+
+本项目已接入 **GitHub Actions 自动部署**，线上地址：
+
+🌐 **https://fatallove101.github.io/omniconvert/**（每次 `push` 到 `main` 自动更新）
+
+- **构建**：`scripts/build-web.mjs` 只把 `index.html`、`css/`、`js/`、`vendor/`、`assets/`、`manifest.webmanifest`、`sw.js` 拷到 `dist/`，并写 `.nojekyll`（跳过 Jekyll），排除 `test/`、`src-tauri/`、`miniprogram/`
+- **发布**：`.github/workflows/pages.yml` 在 `push` 到 `main` 时执行「构建 → upload-pages-artifact → deploy-pages」；Pages 来源已设为 "GitHub Actions"
+- **复用**：仓库需为 public；换账号/仓库时用 API `build_type=workflow` 启用 Pages（或 Settings → Pages 选 "GitHub Actions"）
+- **换平台**：Cloudflare Pages / Netlify 指向同一个 `scripts/build-web.mjs`，产物目录填 `dist` 即可——本项目不需要任何自定义响应头，纯静态托管即可
 
 ### 已知边界
 
