@@ -25,11 +25,11 @@ A BentoPDF / Stirling-PDF style file conversion tool that runs **entirely in you
 > Version history lives in [Releases](https://github.com/Fatallove101/omniconvert/releases) — every version carries its own changelog (full iteration record since v0.1.0).
 
 ```
-Double-click start.bat
-→ starts a local server and opens http://localhost:8137
+Double-click start.bat (safe to double-click again: it takes over the old server and opens the browser only once)
+→ starts the local server and opens http://localhost:8137
 ```
 
-Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-dependency static server, no admin rights needed).
+Or manually: `powershell -ExecutionPolicy Bypass -File server.ps1` (zero-dependency static server, no admin rights needed); or `powershell -ExecutionPolicy Bypass -File start.ps1` (idempotent launcher, same as start.bat).
 
 - **Mobile**: connect your phone to the same Wi-Fi, change the listener in `server.ps1` to `IPAddress.Any`, allow port 8137 in the firewall, then visit `http://<PC-IP>:8137`
 - **Production**: the whole directory is pure static files — host it on GitHub Pages / Cloudflare Pages / EdgeOne Pages / Nginx for free
@@ -111,7 +111,8 @@ omniconvert/
 ├── miniprogram/          # WeChat Mini Program skeleton (see its README)
 ├── src-tauri/            # Windows desktop app (Tauri v2)
 ├── server.ps1            # Zero-dependency local static server (TcpListener)
-├── start.bat             # One-click launcher
+├── start.ps1             # Idempotent launcher: take over old server + start + open browser once (backed by start.bat)
+├── start.bat             # One-click launcher (calls start.ps1)
 └── test/                 # Fixture generator + self-test suites
 ```
 
@@ -125,7 +126,7 @@ omniconvert/
 
 | Form | How to get it | Notes |
 | --- | --- | --- |
-| Web app (local) | Double-click `start.bat`, or run `server.ps1` yourself | Zero-dependency local static server, open `http://localhost:8137` |
+| Web app (local) | Double-click `start.bat` (safe to re-run), or run `server.ps1` / `start.ps1` yourself | Zero-dependency local static server, open `http://localhost:8137` |
 | Web app (public) | Host the plain static directory on GitHub Pages / Nginx / object storage + CDN | No backend, no database, no server cost |
 | PWA | "Install app / Add to home screen" in the browser | `sw.js` caches the app shell, works offline |
 | Windows desktop app | [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest) — installer or portable | Tauri + WebView2 shell wrapping the same frontend, still zero upload |
@@ -160,7 +161,8 @@ Packaging details and pitfalls (all of them encoded in the source):
 
 ```
 Double-click start.bat
-→ starts the local server in a minimized window and opens http://localhost:8137
+→ takes over the old server (kills the process holding the port) → starts in a minimized window → opens the browser once ready
+  Idempotent: double-clicking again won't hit a port conflict or open more tabs
 ```
 
 Or manually, with configurable port and root:

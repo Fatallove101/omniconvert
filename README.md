@@ -25,11 +25,11 @@
 > 版本历史见 [Releases](https://github.com/Fatallove101/omniconvert/releases)：每个版本都有对应的更新说明（v0.1.0 起的完整迭代记录）。
 
 ```
-双击 start.bat
-→ 自动启动本地服务并在浏览器打开 http://localhost:8137
+双击 start.bat（可重复双击：自动接管旧服务、只开一次浏览器）
+→ 启动本地服务并打开 http://localhost:8137
 ```
 
-也可以手动启动：`powershell -ExecutionPolicy Bypass -File server.ps1`（零依赖静态服务器，无需管理员权限）。
+也可以手动启动：`powershell -ExecutionPolicy Bypass -File server.ps1`（零依赖静态服务器，无需管理员权限）；或 `powershell -ExecutionPolicy Bypass -File start.ps1`（幂等启动器，等价于 start.bat）。
 
 - 手机访问：让手机与电脑连同一 Wi-Fi，把 `server.ps1` 中监听地址改为 `IPAddress.Any`，防火墙放行 8137 端口后访问 `http://<电脑IP>:8137`
 - 正式部署：整个目录是纯静态文件，可直接托管到 GitHub Pages / Nginx / 对象存储 + CDN
@@ -115,7 +115,8 @@ omniconvert/
 ├── manifest.webmanifest  # PWA 清单（可安装到桌面/手机主屏）
 ├── sw.js                 # Service Worker：离线缓存（改代码后请升版本号）
 ├── server.ps1            # 零依赖本地静态服务器（TcpListener）
-├── start.bat             # 一键启动
+├── start.ps1             # 幂等启动器：接管旧服务 + 启动 + 开一次浏览器（start.bat 的载体）
+├── start.bat             # 一键启动（调用 start.ps1）
 └── test/                 # 测试夹具生成脚本 + 夹具
 ```
 
@@ -129,7 +130,7 @@ omniconvert/
 
 | 形态 | 怎么拿到 | 说明 |
 | --- | --- | --- |
-| 网页版（本地） | 双击 `start.bat`，或手动跑 `server.ps1` | 零依赖本地静态服务，浏览器开 `http://localhost:8137` |
+| 网页版（本地） | 双击 `start.bat`（可重复双击），或手动跑 `server.ps1` / `start.ps1` | 零依赖本地静态服务，浏览器开 `http://localhost:8137` |
 | 网页版（公网） | 把纯静态目录托管到 GitHub Pages / Nginx / 对象存储 + CDN | 无后端、无数据库、零服务器成本 |
 | PWA | 浏览器里点「安装应用 / 添加到主屏」 | `sw.js` 缓存应用外壳，断网也能用 |
 | Windows 桌面版 | [Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest) 安装版 / 绿色版 | Tauri + WebView2 外壳，前端原样内嵌，同样零上传 |
@@ -164,7 +165,9 @@ omniconvert/
 
 ```
 双击 start.bat
-→ 自动（最小化窗口）启动本地服务，并打开 http://localhost:8137
+→ 自动接管旧服务（结束占用端口的旧进程）→ 最小化窗口启动 → 就绪后打开一次浏览器
+  幂等：重复双击不会端口冲突、不会越开越多标签页
+```
 ```
 
 等价的手动方式（可换端口、换站点目录）：
