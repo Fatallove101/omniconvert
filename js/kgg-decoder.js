@@ -138,7 +138,7 @@
     if (typeof DecompressionStream === 'undefined') {
       throw new Error('浏览器过旧，缺少 DecompressionStream，无法解压 KGG 公钥');
     }
-    const res = await fetch('/vendor/um/kugou-pubkey.deflate');
+    const res = await fetch(new URL('vendor/um/kugou-pubkey.deflate', document.baseURI));
     if (!res.ok) throw new Error('KGG 公钥文件加载失败: ' + res.status);
     const ds = new DecompressionStream('deflate-raw');
     const buf = new Uint8Array(await new Response(res.body.pipeThrough(ds)).arrayBuffer());
