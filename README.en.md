@@ -19,8 +19,8 @@ A BentoPDF / Stirling-PDF style file conversion tool that runs **entirely in you
 ## Quick Start
 
 **Just want the desktop app? [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest)**:
-- [Installer OmniConvert_v0.5.1_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-setup.exe) (setup wizard + Start menu + uninstaller)
-- [Portable OmniConvert_v0.5.1_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-portable.exe) (run it directly, no install)
+- [Installer OmniConvert_v0.5.2_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.2/OmniConvert_v0.5.2_x64-setup.exe) (setup wizard + Start menu + uninstaller)
+- [Portable OmniConvert_v0.5.2_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.2/OmniConvert_v0.5.2_x64-portable.exe) (run it directly, no install)
 
 > Version history lives in [Releases](https://github.com/Fatallove101/omniconvert/releases) — every version carries its own changelog (full iteration record since v0.1.0).
 
@@ -155,6 +155,7 @@ Packaging details and pitfalls (all of them encoded in the source):
 - **WebView2 runtime**: `webviewInstallMode = downloadBootstrapper` in `src-tauri/tauri.conf.json` downloads the runtime during setup, which keeps the installer a few MB
 - **The desktop build never registers a Service Worker**: a stale SW on `tauri.localhost` hijacks navigation (its internal fetch gets DNS-poisoned on some networks) and whitescreens the window. `js/app.js` therefore unregisters any SW and clears caches when it detects Tauri, and `src-tauri/src/main.rs` points the WebView2 user-data folder at `%LOCALAPPDATA%\OmniConvert\WebView2` to start clean
 - **Frontend changes require a rebuild**: run `make-dist.ps1` first, then `npm run tauri build`. `dist/` is a build output and is not committed
+- **Where desktop downloads go**: the desktop build has no browser download shelf, so every "Download" is **saved to a fixed folder** — `%USERPROFILE%\Downloads\OmniConvert` — and when it finishes the page shows "✅ Saved: <full path>" with **Open folder / Copy path** buttons. The web version is unaffected (it keeps the browser's own download UI).
 - **One-command release**: `node test/make-releases.mjs --release v0.5.1 --assets "installer;portable"` — reads the token from Git Credential Manager, creates/updates the Release, generates the changelog from git history, and uploads both exes. Extra modes: `--backfill-missing` (create releases for old tags), `--refresh-notes` (regenerate notes), `--mark-old` (banner + pre-release flag on older versions so only the newest keeps the Latest badge)
 
 ### 2. Local deployment and browser access

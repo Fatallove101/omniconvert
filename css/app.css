@@ -513,6 +513,33 @@ html, body {
 }
 .error-action:hover { filter: brightness(1.08); }
 
+/* ---------- 桌面端下载落盘提示（无浏览器下载栏，必须自己告知路径） ---------- */
+.dl-tip {
+  margin-top: 14px;
+  padding: 11px 14px;
+  border: 1px solid var(--ok);
+  background: rgba(5, 150, 105, 0.1);
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: var(--text);
+  word-break: break-all;
+}
+.dl-tip-line { margin-bottom: 9px; font-weight: 600; }
+.dl-tip-btn {
+  margin-right: 8px;
+  background: var(--primary);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dl-tip-btn.ghost { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+.dl-tip-btn:hover { filter: brightness(1.08); }
+.dl-dir { margin-top: 10px; color: var(--muted); font-size: 12.5px; word-break: break-all; }
+
 .results { margin-top: 16px; }
 .results-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .results-head h3 { margin: 0; color: var(--ok); font-size: 16px; }

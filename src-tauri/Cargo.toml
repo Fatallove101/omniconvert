@@ -1,6 +1,6 @@
 [package]
 name = "omniconvert"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 description = "万象转换 OmniConvert — 本地文件格式转换"
 

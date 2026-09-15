@@ -1,22 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "万象转换",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "identifier": "app.omniconvert.desktop",
   "build": {
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "万象转换 OmniConvert",
-        "width": 1200,
-        "height": 820,
-        "minWidth": 380,
-        "minHeight": 560,
-        "center": true
-      }
-    ],
+    "withGlobalTauri": true,
+    "windows": [],
     "security": {
       "csp": null
     }

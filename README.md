@@ -19,8 +19,8 @@
 ## 快速开始
 
 **只想用桌面版？[前往 Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest)**：
-- [安装版 OmniConvert_v0.5.1_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-setup.exe)（安装向导 + 开始菜单 + 可卸载）
-- [绿色版 OmniConvert_v0.5.1_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-portable.exe)（双击即用，无需安装）
+- [安装版 OmniConvert_v0.5.2_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.2/OmniConvert_v0.5.2_x64-setup.exe)（安装向导 + 开始菜单 + 可卸载）
+- [绿色版 OmniConvert_v0.5.2_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.2/OmniConvert_v0.5.2_x64-portable.exe)（双击即用，无需安装）
 
 > 版本历史见 [Releases](https://github.com/Fatallove101/omniconvert/releases)：每个版本都有对应的更新说明（v0.1.0 起的完整迭代记录）。
 
@@ -159,6 +159,7 @@ omniconvert/
 - **WebView2 运行时**：`src-tauri/tauri.conf.json` 里 `webviewInstallMode = downloadBootstrapper`，安装时按需下载运行时，安装包因此只有几 MB
 - **桌面端坚决不开 Service Worker**：`tauri.localhost` 上的旧 SW 一旦劫持导航（其内部 fetch 会被网络 DNS 污染）就会整页白屏，所以 `js/app.js` 检测到 Tauri 环境会主动注销 SW 并清空 Cache，`src-tauri/src/main.rs` 还把 WebView2 用户数据目录指到 `%LOCALAPPDATA%\OmniConvert\WebView2`，从源头保证干净
 - **改了前端必须重新打包**：顺序是先 `make-dist.ps1` 再 `npm run tauri build`；`dist/` 是构建产物，不提交 Git
+- **桌面端下载位置**：桌面端没有浏览器的下载栏，所以所有「下载」会**固定保存到** `%USERPROFILE%\Downloads\OmniConvert`；转换完成后页面会显示「✅ 已保存：完整路径」并提供「打开文件夹 / 复制路径」，用户不必猜文件去哪了（网页端不受影响，仍走浏览器自己的下载）
 - **一键发布**：`node test/make-releases.mjs --release v0.5.1 --assets "安装包;绿色版"` —— 从 Git 凭据管理器读令牌 → 创建/更新 Release → 按 git 历史自动生成更新说明 → 上传两个 exe；另有 `--backfill-missing`（补齐历史版本）、`--refresh-notes`（重刷说明）、`--mark-old`（旧版加"建议下载最新版"提示并标 pre-release，Latest 只留最新版）
 
 ### 二、部署到本地，用浏览器访问

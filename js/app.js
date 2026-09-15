@@ -6,7 +6,7 @@
   'use strict';
 
   const App = {
-    VERSION: 'v1.30',
+    VERSION: 'v1.31',
     tools: [],
     state: { toolId: null, files: [], results: [], busy: false },
     categories: [
@@ -134,6 +134,123 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+    /* 桌面端没有浏览器的下载栏：立刻给"正在保存到 …"，确认落盘后变"已保存" */
+    if (App.isTauri() && App._downloadDir) {
+      const sep = /[\\/]$/.test(App._downloadDir) ? '' : '\\';
+      App.confirmDesktopSave(App._downloadDir + sep + name);
+    }
+  };
+
+  /* ---------- 桌面端（Tauri）：下载没有浏览器下载栏，必须自己给反馈 ---------- */
+
+  App.isTauri = function () {
+    return location.hostname === 'tauri.localhost' || !!window.__TAURI_INTERNALS__;
+  };
+
+  App.desktopInvoke = function (cmd, args) {
+    const t = window.__TAURI__;
+    if (t && t.core && typeof t.core.invoke === 'function') return t.core.invoke(cmd, args);
+    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function') {
+      return window.__TAURI_INTERNALS__.invoke(cmd, args);
+    }
+    return Promise.reject(new Error('不在桌面端环境中'));
+  };
+
+  /** 在工具页显示下载落盘提示。
+   *  state: 'saving' 正在保存 / 'ok' 已保存 / 'fail' 未能确认（桌面端没有浏览器下载栏，
+   *  必须由页面自己告诉用户文件去哪了） */
+  App.showDownloadTip = function (path, state) {
+    App._lastDownloadTip = { path: path, state: state }; /* 记住，切页后还能补显示 */
+    const box = App.$('#dl-tip');
+    if (!box) return;
+    box.hidden = false;
+    box.textContent = '';
+    const prefix = state === 'ok' ? '✅ 已保存：' : state === 'saving' ? '⏳ 正在保存到：' : '⚠️ 未能确认保存，请到该目录查看：';
+    const line = document.createElement('div');
+    line.className = 'dl-tip-line';
+    line.textContent = prefix + (path || '（路径未知）');
+    box.appendChild(line);
+    if (!path) return;
+    const mkBtn = (label, cls, onClick) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dl-tip-btn' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+    box.appendChild(
+      mkBtn('打开文件夹', '', () => {
+        App.desktopInvoke('oc_open_folder', { path }).catch((e) => App.showError('打开文件夹失败：' + (e.message || e)));
+      })
+    );
+    box.appendChild(
+      mkBtn('复制路径', 'ghost', async () => {
+        try {
+          await navigator.clipboard.writeText(path);
+        } catch (e) {
+          /* 剪贴板不可用就算了 */
+        }
+      })
+    );
+  };
+
+  /** 桌面端：轮询确认文件真的落盘（不依赖上游的下载完成回调，更可靠） */
+  App.confirmDesktopSave = function (target) {
+    App.showDownloadTip(target, 'saving');
+    let last = -1;
+    let stable = 0;
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries++;
+      let size = null;
+      try {
+        size = await App.desktopInvoke('oc_file_size', { path: target });
+      } catch (e) {
+        size = null;
+      }
+      if (typeof size === 'number' && size > 0) {
+        if (size === last) {
+          stable++;
+          if (stable >= 2) {
+            clearInterval(timer);
+            App.showDownloadTip(target, 'ok');
+            return;
+          }
+        } else {
+          last = size;
+          stable = 0;
+        }
+      }
+      if (tries >= 50) {
+        /* 约 20 秒仍未确认：给出可操作提示，而不是一直转圈 */
+        clearInterval(timer);
+        App.showDownloadTip(target, 'fail');
+      }
+    }, 400);
+  };
+
+  /** 桌面端启动时挂一次：问出保存目录（显示给用户）+ 监听下载完成事件 */
+  App.initDesktopDownload = function () {
+    if (!App.isTauri()) return;
+    App.desktopInvoke('oc_download_dir')
+      .then((dir) => {
+        App._downloadDir = dir;
+        const el = App.$('#dl-dir');
+        if (el) {
+          el.textContent = `桌面端下载会保存到：${dir}`;
+          el.hidden = false;
+        }
+      })
+      .catch(() => {});
+    const t = window.__TAURI__;
+    if (t && t.event && typeof t.event.listen === 'function') {
+      /* 上游若送达下载完成事件就直接用；送不到也没关系 —— confirmDesktopSave 会自行确认 */
+      t.event.listen('oc-download-finished', (e) => {
+        const p = (e && e.payload) || {};
+        if (p.path) App.showDownloadTip(p.path, p.success ? 'ok' : 'fail');
+      });
+    }
   };
 
   App.makeZip = async function (entries) {
@@ -437,6 +554,8 @@
             <div id="status" class="status"></div>
           </div>
           <div id="error-box" class="error-box" hidden></div>
+          <div id="dl-tip" class="dl-tip" hidden></div>
+          <div id="dl-dir" class="dl-dir" hidden></div>
           <div id="results" class="results" hidden>
             <div class="results-head">
               <h3>转换完成 ✅</h3>
@@ -501,6 +620,16 @@
         App.addFiles(id, carry);
         App.setStatus(`已把 ${carry.length} 个文件带过来，点「开始转换」即可`, true);
       }
+    }
+
+    /* 桌面端：显示保存目录；若上一批的"已保存"提示还在，补显示出来 */
+    if (App.isTauri()) {
+      const dirEl = App.$('#dl-dir');
+      if (dirEl && App._downloadDir) {
+        dirEl.textContent = `桌面端下载会保存到：${App._downloadDir}`;
+        dirEl.hidden = false;
+      }
+      if (App._lastDownloadTip) App.showDownloadTip(App._lastDownloadTip.path, App._lastDownloadTip.state);
     }
   };
 
@@ -1112,11 +1241,14 @@
       });
     }
 
+    /* 桌面端（Tauri）：下载没有浏览器下载栏，启动时问出保存目录并监听下载完成事件 */
+    App.initDesktopDownload();
+
     /* Service Worker：仅在浏览器环境注册。
      * 桌面端（Tauri 的 tauri.localhost）绝对不能开 —— SW 的网络 fetch 会被
      * 系统 DNS 污染/劫持，导致页面导航失败白屏；桌面资源本身已内嵌，无需 SW。 */
     if ('serviceWorker' in navigator) {
-      const isTauri = location.hostname === 'tauri.localhost' || !!(window.__TAURI_INTERNALS__);
+      const isTauri = App.isTauri();
       if (isTauri) {
         navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
         if (window.caches) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k)));
