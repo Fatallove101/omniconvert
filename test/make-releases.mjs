@@ -168,10 +168,16 @@ function buildNotes(tag) {
   return lines.join('\n');
 }
 
+function latestStableTag() {
+  for (let i = tags.length - 1; i >= 0; i--) if (!isPreTag(tags[i])) return tags[i];
+  return tags[tags.length - 1];
+}
+
 function bodyFor(tag, extraFooter = '') {
+  /* 桌面版下载表只写给"最新正式版"；旧版的正文顶部另有"建议下载最新版"引导 */
   const desktopHint =
-    tag === 'v0.5.0'
-      ? '\n### 桌面版下载（Windows 10/11）\n\n| 文件 | 说明 |\n| --- | --- |\n| **OmniConvert_v0.5.0_x64-setup.exe** | 安装版：安装向导 + 开始菜单 + 可卸载 |\n| **OmniConvert_v0.5.0_x64-portable.exe** | 绿色版：双击即用，无需安装 |\n\n🔒 所有转换都在本机完成，文件永不上传。\n'
+    tag === latestStableTag()
+      ? `\n### 桌面版下载（Windows 10/11）\n\n| 文件 | 说明 |\n| --- | --- |\n| **OmniConvert_${tag}_x64-setup.exe** | 安装版：安装向导 + 开始菜单 + 可卸载 |\n| **OmniConvert_${tag}_x64-portable.exe** | 绿色版：双击即用，无需安装 |\n\n🔒 所有转换都在本机完成，文件永不上传。\n`
       : '';
   return `${bodyForPrefix(tag)}${buildNotes(tag)}\n${desktopHint}${extraFooter}`;
 }

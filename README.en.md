@@ -19,8 +19,8 @@ A BentoPDF / Stirling-PDF style file conversion tool that runs **entirely in you
 ## Quick Start
 
 **Just want the desktop app? [Download from Releases](https://github.com/Fatallove101/omniconvert/releases/latest)**:
-- [Installer OmniConvert_v0.5.0_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.0/OmniConvert_v0.5.0_x64-setup.exe) (setup wizard + Start menu + uninstaller)
-- [Portable OmniConvert_v0.5.0_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.0/OmniConvert_v0.5.0_x64-portable.exe) (run it directly, no install)
+- [Installer OmniConvert_v0.5.1_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-setup.exe) (setup wizard + Start menu + uninstaller)
+- [Portable OmniConvert_v0.5.1_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-portable.exe) (run it directly, no install)
 
 > Version history lives in [Releases](https://github.com/Fatallove101/omniconvert/releases) — every version carries its own changelog (full iteration record since v0.1.0).
 

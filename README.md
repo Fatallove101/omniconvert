@@ -19,8 +19,8 @@
 ## 快速开始
 
 **只想用桌面版？[前往 Releases 下载](https://github.com/Fatallove101/omniconvert/releases/latest)**：
-- [安装版 OmniConvert_v0.5.0_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.0/OmniConvert_v0.5.0_x64-setup.exe)（安装向导 + 开始菜单 + 可卸载）
-- [绿色版 OmniConvert_v0.5.0_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.0/OmniConvert_v0.5.0_x64-portable.exe)（双击即用，无需安装）
+- [安装版 OmniConvert_v0.5.1_x64-setup.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-setup.exe)（安装向导 + 开始菜单 + 可卸载）
+- [绿色版 OmniConvert_v0.5.1_x64-portable.exe](https://github.com/Fatallove101/omniconvert/releases/download/v0.5.1/OmniConvert_v0.5.1_x64-portable.exe)（双击即用，无需安装）
 
 > 版本历史见 [Releases](https://github.com/Fatallove101/omniconvert/releases)：每个版本都有对应的更新说明（v0.1.0 起的完整迭代记录）。
 
